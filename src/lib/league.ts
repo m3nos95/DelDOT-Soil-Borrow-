@@ -5,7 +5,8 @@ import { simulateGame } from "./sim";
 
 export { PARKS } from "./constants";
 
-const inviteAlphabet = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 6);
+// Avoid ambiguous glyphs (I/1/O/0/W/H lookalike pairs in some fonts)
+const inviteAlphabet = customAlphabet("ABCDEFGJKMNPQRTUVXY23456789", 6);
 
 export function generateInviteCode() {
   return inviteAlphabet();
