@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  teams        Team[]
+  leaguesOwned League[] @relation("LeagueCommissioner")
+}
+
+model Player {
+  id           String       @id @default(cuid())
+  name         String
+  yearFrom     Int
+  yearTo       Int
+  primaryPos   String
+  positions    String
+  bats         String
+  throws       String
+  salary       Int
+  isPitcher    Boolean
+  /// Rates are per 1000 PA / BF for simulation
+  kRate        Float
+  bbRate       Float
+  hbpRate      Float
+  singleRate   Float
+  doubleRate   Float
+  tripleRate   Float
+  hrRate       Float
+  /// Pitcher quality modifiers (higher stuff = more Ks, higher control = fewer walks)
+  stuff        Float        @default(50)
+  control      Float        @default(50)
+  durability   Float        @default(50)
+  description  String       @default("")
+  rosterSpots  RosterSpot[]
+  lineupSlots  LineupSlot[]
+  staffSlots   StaffSlot[]
+}
+
+model League {
+  id              String   @id @default(cuid())
+  name            String
+  inviteCode      String   @unique
+  salaryCap       Int      @default(120000000)
+  maxTeams        Int      @default(6)
+  gamesPerTeam    Int      @default(20)
+  status          String   @default("forming") // forming | drafting | season | complete
+  commissionerId  String
+  commissioner    User     @relation("LeagueCommissioner", fields: [commissionerId], references: [id])
+  createdAt       DateTime @default(now())
+  teams           Team[]
+  games           Game[]
+}
+
+model Team {
+  id           String       @id @default(cuid())
+  leagueId     String
+  league       League       @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  ownerId      String
+  owner        User         @relation(fields: [ownerId], references: [id])
+  name         String
+  abbreviation String
+  park         String       @default("Generic Park")
+  wins         Int          @default(0)
+  losses       Int          @default(0)
+  runsFor      Int          @default(0)
+  runsAgainst  Int          @default(0)
+  draftReady   Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  roster       RosterSpot[]
+  lineup       LineupSlot[]
+  staff        StaffSlot[]
+  homeGames    Game[]       @relation("HomeTeam")
+  awayGames    Game[]       @relation("AwayTeam")
+
+  @@unique([leagueId, ownerId])
+  @@unique([leagueId, abbreviation])
+}
+
+model RosterSpot {
+  id       String @id @default(cuid())
+  teamId   String
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id])
+
+  @@unique([teamId, playerId])
+}
+
+model LineupSlot {
+  id           String @id @default(cuid())
+  teamId       String
+  team         Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerId     String
+  player       Player @relation(fields: [playerId], references: [id])
+  battingOrder Int
+  position     String
+
+  @@unique([teamId, battingOrder])
+  @@unique([teamId, position])
+}
+
+model StaffSlot {
+  id       String @id @default(cuid())
+  teamId   String
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id])
+  role     String // SP1 SP2 SP3 SP4 SP5 CL SU1 SU2 LR
+
+  @@unique([teamId, role])
+  @@unique([teamId, playerId])
+}
+
+model Game {
+  id           String   @id @default(cuid())
+  leagueId     String
+  league       League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  homeTeamId   String
+  homeTeam     Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeamId   String
+  awayTeam     Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  dayNumber    Int
+  status       String   @default("scheduled") // scheduled | final
+  homeScore    Int      @default(0)
+  awayScore    Int      @default(0)
+  innings      String   @default("[]") // JSON inning scores
+  playByPlay   String   @default("[]") // JSON events
+  boxScore     String   @default("{}") // JSON box
+  homePitcher  String   @default("")
+  awayPitcher  String   @default("")
+  createdAt    DateTime @default(now())
+  playedAt     DateTime?
+}

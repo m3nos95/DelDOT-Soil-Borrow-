@@ -1,0 +1,206 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #071410;
+  --field: #0f2a1f;
+  --grass: #1a4a32;
+  --chalk: #f0ebe0;
+  --fog: #c9c2b3;
+  --clay: #c45c26;
+  --foul: #e6c35c;
+  --seam: #b91c1c;
+  --board: #0a1f17;
+  --line: rgba(240, 235, 224, 0.14);
+  --glow: rgba(230, 195, 92, 0.35);
+  --background: var(--ink);
+  --foreground: var(--chalk);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ink: var(--ink);
+  --color-field: var(--field);
+  --color-grass: var(--grass);
+  --color-chalk: var(--chalk);
+  --color-fog: var(--fog);
+  --color-clay: var(--clay);
+  --color-foul: var(--foul);
+  --color-seam: var(--seam);
+  --color-board: var(--board);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--chalk);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(230, 195, 92, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 10% 0%, rgba(26, 74, 50, 0.55), transparent 50%),
+    linear-gradient(180deg, #0a1812 0%, var(--ink) 40%, #040a08 100%);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(230, 195, 92, 0.35);
+  color: var(--chalk);
+}
+
+.diamond-grid {
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+.scoreboard {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%),
+    var(--board);
+  border: 1px solid var(--line);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 0.75rem 1.25rem;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: var(--foul);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px rgba(230, 195, 92, 0.2), 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.btn-primary:hover {
+  background: #f0d070;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--chalk);
+}
+
+.btn-ghost:hover {
+  border-color: rgba(240, 235, 224, 0.35);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.btn-danger {
+  background: transparent;
+  border-color: rgba(185, 28, 28, 0.5);
+  color: #fca5a5;
+}
+
+.field-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--chalk);
+  border-radius: 2px;
+  padding: 0.8rem 0.9rem;
+  outline: none;
+}
+
+.field-input:focus {
+  border-color: rgba(230, 195, 92, 0.55);
+  box-shadow: 0 0 0 3px var(--glow);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fog);
+}
+
+.fade-up {
+  animation: fadeUp 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fade-up-delay {
+  animation: fadeUp 800ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+
+.fade-up-delay-2 {
+  animation: fadeUp 900ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pulse-line {
+  position: relative;
+}
+
+.pulse-line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--foul), transparent);
+  animation: sweep 2.8s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scaleX(0.4);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.table-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
