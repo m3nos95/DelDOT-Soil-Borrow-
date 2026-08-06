@@ -82,6 +82,7 @@ export async function joinLeagueAction(
   const user = await mustUser();
   const code = String(formData.get("inviteCode") ?? "")
     .trim()
+    .replace(/\s+/g, "")
     .toUpperCase();
   const teamName = String(formData.get("teamName") ?? "").trim();
   const abbreviation = String(formData.get("abbreviation") ?? "")

@@ -59,7 +59,7 @@ export default async function LeaguePage({
             </h1>
             <p className="mt-1 text-sm text-[var(--fog)]">
               Invite code{" "}
-              <span className="font-mono tracking-[0.25em] text-[var(--foul)]">
+              <span className="inline-flex items-center rounded-sm border border-[var(--line)] bg-black/30 px-2 py-0.5 font-mono text-[var(--foul)]">
                 {league.inviteCode}
               </span>{" "}
               · {league.teams.length}/{league.maxTeams} teams ·{" "}

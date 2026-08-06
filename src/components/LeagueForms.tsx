@@ -98,9 +98,11 @@ export function JoinLeagueForm() {
         <input
           id="inviteCode"
           name="inviteCode"
-          className="field-input uppercase tracking-[0.2em]"
+          className="field-input font-mono uppercase"
           required
           placeholder="AB12CD"
+          autoComplete="off"
+          spellCheck={false}
         />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
