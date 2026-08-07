@@ -57,6 +57,7 @@ function toSimPlayer(p: {
   control: number;
   durability?: number;
   careerWAR?: number;
+  goldGloves?: number;
 }): SimPlayer {
   return {
     id: p.id,

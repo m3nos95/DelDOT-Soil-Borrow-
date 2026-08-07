@@ -32,6 +32,7 @@ type CareerPlayer = {
   control: number;
   durability: number;
   careerWAR?: number;
+  goldGloves?: number;
   description: string;
 };
 
@@ -75,6 +76,7 @@ async function seedPlayers() {
         control: p.control ?? 50,
         durability: p.durability ?? 50,
         careerWAR: p.careerWAR ?? 0,
+        goldGloves: p.goldGloves ?? 0,
         description: p.description ?? "",
       })),
     });

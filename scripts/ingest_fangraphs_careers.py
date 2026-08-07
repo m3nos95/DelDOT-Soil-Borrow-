@@ -411,6 +411,9 @@ def main():
         p["name"] = f"{p['name']} ({p['yearFrom']}-{p['yearTo']})"
         seen[key + str(p["fangraphsId"])] = p
 
+    for p in players:
+        p.setdefault("goldGloves", 0)
+
     OUT_JSON.write_text(json.dumps(players))
     meta = {
         "source": "FanGraphs leaders API (season rows aggregated to career)",
@@ -424,6 +427,12 @@ def main():
     OUT_META.write_text(json.dumps(meta, indent=2))
     print(json.dumps(meta, indent=2))
     print(f"Wrote {OUT_JSON}")
+
+    # Attach Gold Glove counts (1957+) without another FanGraphs pull
+    import subprocess
+
+    gg = Path(__file__).resolve().parent / "apply_gold_gloves.py"
+    subprocess.check_call(["python3", str(gg)])
 
 
 if __name__ == "__main__":

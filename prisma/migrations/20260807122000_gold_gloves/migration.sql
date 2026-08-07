@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Player" ADD COLUMN "goldGloves" INTEGER NOT NULL DEFAULT 0;

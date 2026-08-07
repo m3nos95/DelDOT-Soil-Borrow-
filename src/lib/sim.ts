@@ -159,13 +159,21 @@ export function deriveSpeed(p: {
   return clamp(28 + p.tripleRate * 3.2 - p.hrRate * 0.15, 20, 96);
 }
 
-/** Position + light WAR bump — no defensive metrics in the FG card yet. */
+/**
+ * Position baseline + light WAR bump (helps pre-1957 gloves) + Gold Glove bonus.
+ * GG award began in 1957 — earlier eras stay on position/WAR only.
+ */
 export function deriveDefense(p: {
   primaryPos: string;
   isPitcher?: boolean;
   careerWAR?: number;
+  goldGloves?: number;
 }): number {
-  if (p.isPitcher) return 40;
+  const gg = Math.max(0, p.goldGloves ?? 0);
+  // Pitchers: Maddux-type gloves matter a little on come-backers / bunts proxy
+  if (p.isPitcher) {
+    return clamp(40 + Math.min(18, gg * 1.1), 35, 70);
+  }
   const base: Record<string, number> = {
     C: 56,
     SS: 64,
@@ -181,10 +189,20 @@ export function deriveDefense(p: {
     P: 40,
   };
   let d = base[p.primaryPos] ?? 50;
+  // Soft WAR signal for eras / players without GG hardware
   if (p.careerWAR != null) {
-    d += clamp((p.careerWAR - 25) * 0.12, -8, 10);
+    d += clamp((p.careerWAR - 25) * 0.1, -6, 8);
   }
-  return clamp(d, 20, 90);
+  // Gold Gloves: strong, with diminishing returns so 16× Brooks >> 5× Santo
+  // 1st–5th: +2.4 each, 6th–10th: +1.6, 11+: +1.0 (cap +30)
+  let ggBonus = 0;
+  for (let i = 1; i <= gg; i++) {
+    if (i <= 5) ggBonus += 2.4;
+    else if (i <= 10) ggBonus += 1.6;
+    else ggBonus += 1.0;
+  }
+  d += Math.min(30, ggBonus);
+  return clamp(d, 20, 96);
 }
 
 /** Average glove of the 8 fielders (skip DH). */

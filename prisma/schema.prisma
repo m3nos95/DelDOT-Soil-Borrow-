@@ -42,6 +42,8 @@ model Player {
   control      Float        @default(50)
   durability   Float        @default(50)
   careerWAR    Float        @default(0)
+  /// Rawlings Gold Gloves (award since 1957; 0 for earlier eras)
+  goldGloves   Int          @default(0)
   description  String       @default("")
   rosterSpots  RosterSpot[]
   lineupSlots  LineupSlot[]
