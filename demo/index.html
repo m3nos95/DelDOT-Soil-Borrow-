@@ -9,12 +9,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Pixelify+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg0: #0a1210;
-      --bg1: #12201c;
-      --chalk: #e8e4d9;
-      --amber: #e8a838;
-      --muted: #8a9a92;
-      --line: rgba(232, 228, 217, 0.12);
+      --bg0: #050d0a;
+      --bg1: #0c2218;
+      --chalk: #f3efe4;
+      --amber: #e8b84a;
+      --muted: #a8b0a4;
+      --line: rgba(243, 239, 228, 0.12);
       --pix: "Pixelify Sans", "IBM Plex Mono", monospace;
       --bit-grass-a: #1f6b3a;
       --bit-grass-b: #175530;
@@ -46,11 +46,26 @@
 
     .brand {
       font-family: "Bebas Neue", sans-serif;
-      font-size: clamp(3.5rem, 12vw, 6rem);
-      letter-spacing: 0.06em;
-      line-height: 0.9;
+      font-size: clamp(4.5rem, 16vw, 8rem);
+      letter-spacing: 0.02em;
+      line-height: 0.82;
       margin: 0;
       animation: rise 0.8s ease-out both;
+      position: relative;
+    }
+    .brand::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 40%;
+      bottom: -8px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--amber), transparent);
+      animation: sweep 3.2s ease-in-out infinite;
+    }
+    @keyframes sweep {
+      0%, 100% { opacity: 0.25; transform: scaleX(0.4); }
+      50% { opacity: 1; transform: scaleX(1); }
     }
 
     .tag {
@@ -97,11 +112,18 @@
 
     select {
       width: 100%;
-      background: rgba(10, 18, 16, 0.7);
+      background: transparent;
       color: var(--chalk);
-      border: 1px solid var(--line);
-      padding: 0.75rem 0.85rem;
+      border: none;
+      border-bottom: 1px solid var(--line);
+      padding: 0.85rem 0;
       border-radius: 0;
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.05rem;
+    }
+    select:focus {
+      outline: none;
+      border-bottom-color: var(--amber);
     }
 
     .actions {
@@ -112,28 +134,28 @@
     }
 
     button {
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.78rem;
-      letter-spacing: 0.12em;
+      font-family: "Bebas Neue", sans-serif;
+      font-size: 1.05rem;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      border: none;
+      border: 1px solid transparent;
       cursor: pointer;
-      padding: 0.85rem 1.25rem;
-      transition: transform 0.15s ease, background 0.15s ease;
+      padding: 0.85rem 1.4rem;
+      transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
     }
-    button:active { transform: translateY(1px); }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
     button.primary {
       background: var(--amber);
-      color: #1a1205;
-      font-weight: 600;
+      color: #050d0a;
     }
-    button.primary:hover { background: #f0b84a; }
+    button.primary:hover { background: #f0c75c; }
     button.ghost {
       background: transparent;
       color: var(--chalk);
-      border: 1px solid var(--line);
+      border-color: var(--line);
     }
-    button.ghost:hover { border-color: var(--amber); color: var(--amber); }
+    button.ghost:hover { border-color: rgba(243,239,228,0.4); color: var(--amber); }
 
     .note {
       font-family: "IBM Plex Mono", monospace;

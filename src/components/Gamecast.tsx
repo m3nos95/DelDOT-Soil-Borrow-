@@ -113,8 +113,8 @@ export function Gamecast({
   };
 
   return (
-    <section className={`gc-root mb-6 lg:col-span-2 ${bit}`}>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <section className={`gc-root ${bit}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-[family-name:var(--font-pixel)] text-xl tracking-wide text-[var(--bit-edge)] sm:text-2xl">
           Gamecast
         </h2>

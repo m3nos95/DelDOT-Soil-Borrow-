@@ -25,10 +25,16 @@ export function AppHeader({
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           <span className="hidden text-sm text-[var(--fog)] sm:inline">
             {user.displayName}
           </span>
+          <Link
+            href="/clubhouse"
+            className="hidden font-[family-name:var(--font-display)] text-sm tracking-[0.12em] uppercase text-[var(--fog)] transition-colors hover:text-[var(--foul)] sm:inline"
+          >
+            Clubhouse
+          </Link>
           <form action={logoutAction}>
             <button
               type="submit"

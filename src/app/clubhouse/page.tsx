@@ -21,11 +21,14 @@ export default async function ClubhousePage() {
     <div className="page-shell">
       <AppHeader user={session} />
       <main className="mx-auto max-w-3xl px-5 py-12 sm:py-16">
-        <header className="mb-10">
-          <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide sm:text-6xl">
+        <header className="mb-12">
+          <p className="mb-2 font-[family-name:var(--font-display)] text-sm tracking-[0.2em] uppercase text-[var(--foul)]">
+            Welcome back, {session.displayName}
+          </p>
+          <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide sm:text-7xl">
             Clubhouse
           </h1>
-          <p className="mt-3 max-w-lg text-[var(--fog)] leading-relaxed">
+          <p className="mt-4 max-w-lg text-lg text-[var(--fog)] leading-relaxed">
             Your private leagues. Pick an era, claim a city slot, invite the crew.
           </p>
         </header>
@@ -44,16 +47,20 @@ export default async function ClubhousePage() {
                     href={`/league/${team.leagueId}`}
                     className="league-row"
                   >
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                       <div>
-                        <div className="font-[family-name:var(--font-display)] text-2xl tracking-wide sm:text-3xl">
+                        <div className="font-[family-name:var(--font-display)] text-3xl tracking-wide sm:text-4xl">
                           {team.league.name}
                         </div>
-                        <div className="mt-1 text-sm text-[var(--fog)]">
-                          {team.abbreviation} · {era.label}
+                        <div className="mt-1.5 text-sm text-[var(--fog)]">
+                          <span className="text-[var(--chalk)]">
+                            {team.abbreviation}
+                          </span>
+                          {" · "}
+                          {era.label}
                         </div>
                       </div>
-                      <div className="font-[family-name:var(--font-display)] text-sm tracking-[0.12em] uppercase text-[var(--fog)]">
+                      <div className="font-[family-name:var(--font-display)] text-sm tracking-[0.14em] uppercase text-[var(--fog)]">
                         {team.league.status}
                         {team.league.status === "season" ||
                         team.league.status === "complete"
@@ -67,9 +74,12 @@ export default async function ClubhousePage() {
             </div>
           </section>
         ) : (
-          <p className="border-t border-[var(--line)] pt-6 text-[var(--fog)]">
-            No leagues yet — create one or join with an invite code.
-          </p>
+          <section className="empty-diamond fade-up">
+            <h2>No leagues yet</h2>
+            <p className="max-w-md text-[var(--fog)] leading-relaxed">
+              Create a dynasty for your friends, or join with an invite code.
+            </p>
+          </section>
         )}
 
         <ClubhouseActions hasLeagues={teams.length > 0} />

@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
-import { Bebas_Neue, Pixelify_Sans, Sora } from "next/font/google";
+import {
+  Bebas_Neue,
+  IBM_Plex_Mono,
+  Pixelify_Sans,
+  Source_Serif_4,
+} from "next/font/google";
 import "./globals.css";
 
 const display = Bebas_Neue({
@@ -8,9 +13,15 @@ const display = Bebas_Neue({
   variable: "--font-display",
 });
 
-const body = Sora({
+const body = Source_Serif_4({
   subsets: ["latin"],
   variable: "--font-body",
+});
+
+const mono = IBM_Plex_Mono({
+  weight: ["400", "500"],
+  subsets: ["latin"],
+  variable: "--font-mono",
 });
 
 const pixel = Pixelify_Sans({
@@ -28,7 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${display.variable} ${body.variable} ${pixel.variable} h-full`}
+      className={`${display.variable} ${body.variable} ${mono.variable} ${pixel.variable} h-full`}
     >
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>

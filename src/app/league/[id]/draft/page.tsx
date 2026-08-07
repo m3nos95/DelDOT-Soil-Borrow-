@@ -116,14 +116,15 @@ export default async function DraftPage({
     <div className="page-shell">
       <AppHeader user={session} leagueName={league.name} />
       <main className="mx-auto max-w-6xl px-5 py-8 sm:py-10">
-        <h1 className="mb-1 font-[family-name:var(--font-display)] text-5xl tracking-wide">
+        <h1 className="mb-1 font-[family-name:var(--font-display)] text-5xl tracking-wide sm:text-6xl">
           Draft
         </h1>
         <p className="mb-6 text-[var(--fog)]">
           <span className="text-[var(--foul)]">{era.label}</span>
           {era.id !== "open" ? ` · ${era.yearFrom}–${era.yearTo}` : ""}
           {" · "}
-          {poolCount.toLocaleString()} career cards
+          <span className="stat-mono">{poolCount.toLocaleString()}</span> career
+          cards
         </p>
         <LeagueNav leagueId={id} status={league.status} />
         <DraftBoard

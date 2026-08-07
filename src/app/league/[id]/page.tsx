@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { InviteCode } from "@/components/InviteCode";
 import { LeagueNav } from "@/components/LeagueNav";
 import { CommissionerStart, SimDayButton } from "@/components/SeasonControls";
 import { getSession } from "@/lib/auth";
@@ -55,27 +56,23 @@ export default async function LeaguePage({
     <div className="page-shell">
       <AppHeader user={session} leagueName={league.name} />
       <main className="mx-auto max-w-6xl px-5 py-8 sm:py-10">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="mb-1 font-[family-name:var(--font-display)] text-sm tracking-[0.18em] uppercase text-[var(--foul)]">
-              {league.status}
-            </p>
-            <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide sm:text-6xl">
-              {league.name}
-            </h1>
-            <p className="mt-2 text-sm text-[var(--fog)]">
-              Invite{" "}
-              <span className="font-mono text-[var(--foul)]">
-                {league.inviteCode}
-              </span>
-              {" · "}
+        <div className="mb-8">
+          <p className="mb-1 font-[family-name:var(--font-display)] text-sm tracking-[0.18em] uppercase text-[var(--foul)]">
+            {league.status}
+          </p>
+          <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide sm:text-7xl">
+            {league.name}
+          </h1>
+          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[var(--fog)]">
+            <InviteCode code={league.inviteCode} />
+            <span>
               {era.label}
-              {era.id !== "open" ? ` ${era.yearFrom}–${era.yearTo}` : ""}
-              {" · "}
+              {era.id !== "open" ? ` · ${era.yearFrom}–${era.yearTo}` : ""}
+            </span>
+            <span className="stat-mono">
               {league.teams.length}/{league.maxTeams} teams
-              {" · "}
-              {formatSalary(league.salaryCap)}
-            </p>
+            </span>
+            <span className="stat-mono">{formatSalary(league.salaryCap)} cap</span>
           </div>
         </div>
 
@@ -148,7 +145,7 @@ export default async function LeaguePage({
                         <span className="ml-2 text-[var(--foul)]">you</span>
                       ) : null}
                     </div>
-                    <div className="font-mono">
+                    <div className="stat-mono">
                       {formatRecord(t.wins, t.losses)}{" "}
                       <span className="text-[var(--fog)]">
                         ({runDifferential(t.runsFor, t.runsAgainst)})

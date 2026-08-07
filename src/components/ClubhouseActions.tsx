@@ -30,15 +30,20 @@ export function ClubhouseActions({ hasLeagues }: { hasLeagues: boolean }) {
       ) : null}
 
       {mode === "create" ? (
-        <div className="max-w-xl border-t border-[var(--line)] pt-8">
-          <div className="mb-6 flex items-baseline justify-between gap-4">
-            <h2 className="font-[family-name:var(--font-display)] text-3xl tracking-wide">
-              Create a league
-            </h2>
+        <div className="max-w-xl border-t border-[var(--line)] pt-8 fade-up">
+          <div className="mb-8 flex items-baseline justify-between gap-4">
+            <div>
+              <h2 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+                Create a league
+              </h2>
+              <p className="mt-2 text-sm text-[var(--fog)]">
+                Era lock keeps every roster apples-to-apples.
+              </p>
+            </div>
             {hasLeagues ? (
               <button
                 type="button"
-                className="text-sm text-[var(--fog)] hover:text-[var(--foul)]"
+                className="shrink-0 font-[family-name:var(--font-display)] text-sm tracking-[0.12em] uppercase text-[var(--fog)] hover:text-[var(--foul)]"
                 onClick={() => setMode("idle")}
               >
                 Cancel
@@ -46,7 +51,7 @@ export function ClubhouseActions({ hasLeagues }: { hasLeagues: boolean }) {
             ) : (
               <button
                 type="button"
-                className="text-sm text-[var(--fog)] hover:text-[var(--foul)]"
+                className="shrink-0 font-[family-name:var(--font-display)] text-sm tracking-[0.12em] uppercase text-[var(--fog)] hover:text-[var(--foul)]"
                 onClick={() => setMode("join")}
               >
                 Have a code?
@@ -58,14 +63,19 @@ export function ClubhouseActions({ hasLeagues }: { hasLeagues: boolean }) {
       ) : null}
 
       {mode === "join" ? (
-        <div className="max-w-xl border-t border-[var(--line)] pt-8">
-          <div className="mb-6 flex items-baseline justify-between gap-4">
-            <h2 className="font-[family-name:var(--font-display)] text-3xl tracking-wide">
-              Join with code
-            </h2>
+        <div className="max-w-xl border-t border-[var(--line)] pt-8 fade-up">
+          <div className="mb-8 flex items-baseline justify-between gap-4">
+            <div>
+              <h2 className="font-[family-name:var(--font-display)] text-4xl tracking-wide">
+                Join with code
+              </h2>
+              <p className="mt-2 text-sm text-[var(--fog)]">
+                Claim an open city slot in a friend&apos;s league.
+              </p>
+            </div>
             <button
               type="button"
-              className="text-sm text-[var(--fog)] hover:text-[var(--foul)]"
+              className="shrink-0 font-[family-name:var(--font-display)] text-sm tracking-[0.12em] uppercase text-[var(--fog)] hover:text-[var(--foul)]"
               onClick={() => setMode(hasLeagues ? "idle" : "create")}
             >
               {hasLeagues ? "Cancel" : "Create instead"}
