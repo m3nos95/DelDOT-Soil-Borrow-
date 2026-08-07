@@ -51,3 +51,6 @@ prisma/*.db-journal
 .claude/
 .windsurf/
 skills-lock.json
+
+# FanGraphs raw season caches (regenerate via ingest script)
+data/fangraphs/

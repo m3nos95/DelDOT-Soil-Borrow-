@@ -6,7 +6,8 @@ Private historical fantasy baseball for you and your friends — inspired by Ima
 
 - Account login / registration
 - Private leagues with invite codes
-- Salary-cap draft from ~120 historical legends
+- Salary-cap draft from **every MLB career** (FanGraphs, 1871–2025)
+- **One card per player** — no Babe Ruth 1927 vs Babe Ruth 1930
 - Lineup + pitching staff management
 - Day-by-day season simulation with box scores and play-by-play
 
@@ -22,6 +23,13 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Demo account (created by seed): `aaron` / `hardball`
 
+Player pool ships as `data/career_players.json` (built from FanGraphs). To refresh:
+
+```bash
+npm run db:ingest   # pulls FanGraphs season rows, aggregates to career cards
+npm run db:reseed   # clears leagues and reloads the player table
+```
+
 ## How to play with friends
 
 1. Create accounts
@@ -34,4 +42,5 @@ Demo account (created by seed): `aaron` / `hardball`
 
 - Next.js (App Router)
 - Prisma + SQLite
+- FanGraphs leaders API → career cards
 - Cookie sessions (JWT)

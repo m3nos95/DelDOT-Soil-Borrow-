@@ -39,8 +39,8 @@ export default async function HomePage() {
           HARDBALL
         </h1>
         <p className="fade-up-delay mt-8 max-w-xl text-lg text-[var(--fog)] sm:text-xl">
-          Private historical fantasy baseball. Draft legends, set your lineup,
-          and sim the season together — no public lobbies, just your crew.
+          Private historical fantasy baseball. Every career, one card — draft
+          Ruth once, not Ruth 1927. Set your lineup and sim with your crew.
         </p>
         <div className="fade-up-delay-2 mt-10 flex flex-wrap gap-3">
           <Link href="/register" className="btn btn-primary">

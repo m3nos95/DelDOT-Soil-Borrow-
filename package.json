@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:setup": "prisma migrate dev --name init && tsx prisma/seed.ts",
+    "db:reseed": "tsx scripts/reseed-players.ts",
+    "db:ingest": "python3 scripts/ingest_fangraphs_careers.py",
+    "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

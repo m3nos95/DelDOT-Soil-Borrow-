@@ -19,6 +19,7 @@ model User {
 
 model Player {
   id           String       @id @default(cuid())
+  fangraphsId  Int?         @unique
   name         String
   yearFrom     Int
   yearTo       Int
@@ -40,10 +41,14 @@ model Player {
   stuff        Float        @default(50)
   control      Float        @default(50)
   durability   Float        @default(50)
+  careerWAR    Float        @default(0)
   description  String       @default("")
   rosterSpots  RosterSpot[]
   lineupSlots  LineupSlot[]
   staffSlots   StaffSlot[]
+
+  @@index([name])
+  @@index([isPitcher, salary])
 }
 
 model League {

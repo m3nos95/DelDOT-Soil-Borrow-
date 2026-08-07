@@ -1,0 +1,9 @@
+{
+  "source": "FanGraphs leaders API (season rows aggregated to career)",
+  "startYear": 1871,
+  "endYear": 2025,
+  "playerCount": 23395,
+  "hitters": 14576,
+  "pitchers": 8819,
+  "note": "One card per FanGraphs player id. No single-season variants."
+}
