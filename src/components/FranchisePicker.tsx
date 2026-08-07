@@ -67,13 +67,11 @@ export function FranchisePicker({
         </select>
       </div>
       {selected ? (
-        <p className="text-xs text-[var(--fog)]">
-          You&apos;ll be <span className="text-[var(--chalk)]">{selected.name}</span> (
-          {selected.code}) · home: {selected.park}. City codes only — no nicknames or
-          logos.
+        <p className="text-sm text-[var(--fog)]">
+          {selected.name} ({selected.code}) · {selected.park}
         </p>
       ) : (
-        <p className="text-sm text-red-300">No city slots left in this league.</p>
+        <p className="text-sm text-[#f0a8a8]">No city slots left in this league.</p>
       )}
     </div>
   );

@@ -41,9 +41,9 @@ export default async function StandingsPage({
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="page-shell">
       <AppHeader user={session} leagueName={league.name} />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-5 py-8 sm:py-10">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide">

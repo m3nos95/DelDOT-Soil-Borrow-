@@ -37,9 +37,9 @@ export default async function GamePage({
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="page-shell">
       <AppHeader user={session} leagueName={league.name} />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-5 py-8 sm:py-10">
         <Link
           href={`/league/${id}/standings`}
           className="mb-4 inline-block text-sm text-[var(--fog)] hover:text-[var(--foul)]"

@@ -50,9 +50,9 @@ export default async function TeamPage({
     .filter((p) => p.isPitcher);
 
   return (
-    <div className="min-h-screen">
+    <div className="page-shell">
       <AppHeader user={session} leagueName={league.name} />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-5 py-8 sm:py-10">
         <h1 className="mb-1 font-[family-name:var(--font-display)] text-5xl tracking-wide">
           {refreshed.name}
         </h1>

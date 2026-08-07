@@ -8,20 +8,21 @@ export default async function RegisterPage() {
   if (session) redirect("/clubhouse");
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-4 py-12">
-      <div className="pointer-events-none absolute inset-0 diamond-grid opacity-30" />
-      <div className="relative w-full max-w-md scoreboard p-8 shadow-2xl">
+    <main className="page-shell flex min-h-screen flex-col">
+      <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-6">
         <Link
           href="/"
-          className="mb-6 block font-[family-name:var(--font-display)] text-4xl tracking-[0.06em]"
+          className="font-[family-name:var(--font-display)] text-2xl tracking-[0.1em]"
         >
           HARDBALL
         </Link>
-        <h1 className="mb-1 font-[family-name:var(--font-display)] text-3xl tracking-wide">
-          Create account
+      </nav>
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 pb-16">
+        <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide">
+          Join
         </h1>
-        <p className="mb-8 text-sm text-[var(--fog)]">
-          One account. Invite friends with a league code.
+        <p className="mt-2 mb-10 text-[var(--fog)]">
+          Create an account, then start or join an era league.
         </p>
         <RegisterForm />
       </div>

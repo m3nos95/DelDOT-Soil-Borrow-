@@ -110,30 +110,31 @@ export function DraftBoard({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {(
-          [
-            ["hitters", "Hitters"],
-            ["pitchers", "Pitchers"],
-            ["roster", "My roster"],
-          ] as const
-        ).map(([id, label]) => (
-          <Link
-            key={id}
-            href={draftHref(leagueId, {
-              tab: id,
-              page: 1,
-              q: id === "roster" ? "" : query,
-            })}
-            className={`btn !py-2 !px-3 !text-sm ${
-              tab === id ? "btn-primary" : "btn-ghost"
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
+      <div className="flex flex-col gap-4 border-t border-[var(--line)] pt-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="chip-tabs">
+          {(
+            [
+              ["hitters", "Hitters"],
+              ["pitchers", "Pitchers"],
+              ["roster", "My roster"],
+            ] as const
+          ).map(([id, label]) => (
+            <Link
+              key={id}
+              href={draftHref(leagueId, {
+                tab: id,
+                page: 1,
+                q: id === "roster" ? "" : query,
+              })}
+              className="chip-tab"
+              data-active={tab === id}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
         <form
-          className="ml-auto flex min-w-[220px] flex-1 gap-2 sm:max-w-md"
+          className="flex min-w-[220px] flex-1 gap-3 sm:max-w-sm"
           onSubmit={(e) => {
             e.preventDefault();
             router.push(draftHref(leagueId, { tab, page: 1, q: query }));
@@ -141,56 +142,53 @@ export function DraftBoard({
         >
           <input
             className="field-input"
-            placeholder="Search Ruth, Pedro, catcher…"
+            placeholder="Search Ruth, Pedro…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button className="btn btn-ghost !px-3" type="submit">
+          <button className="btn btn-ghost !px-4" type="submit">
             Go
           </button>
         </form>
       </div>
 
-      <div className="scoreboard overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="border-b border-[var(--line)] text-xs uppercase tracking-[0.14em] text-[var(--fog)]">
+      <div className="overflow-x-auto border-t border-[var(--line)]">
+        <table className="draft-table min-w-[640px]">
+          <thead>
             <tr>
-              <th className="px-4 py-3">Player</th>
-              <th className="px-4 py-3">Pos</th>
-              <th className="px-4 py-3">Career</th>
-              <th className="px-4 py-3">WAR</th>
-              <th className="px-4 py-3">Salary</th>
-              <th className="px-4 py-3" />
+              <th>Player</th>
+              <th>Pos</th>
+              <th>Career</th>
+              <th>WAR</th>
+              <th>Salary</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {players.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-[var(--fog)]">
+                <td colSpan={6} className="py-8 text-[var(--fog)]">
                   No players match. Try another search.
                 </td>
               </tr>
             ) : (
               players.map((p) => (
-                <tr
-                  key={p.id}
-                  className="table-row border-b border-[var(--line)]"
-                >
-                  <td className="px-4 py-3">
+                <tr key={p.id} className="table-row">
+                  <td>
                     <div className="font-medium">{p.name}</div>
                     <div className="text-xs text-[var(--fog)]">
                       {p.description}
                     </div>
                   </td>
-                  <td className="px-4 py-3">{p.primaryPos}</td>
-                  <td className="px-4 py-3 text-[var(--fog)]">
+                  <td>{p.primaryPos}</td>
+                  <td className="text-[var(--fog)]">
                     {p.yearFrom}–{p.yearTo}
                   </td>
-                  <td className="px-4 py-3 font-mono">
+                  <td className="font-mono text-sm">
                     {(p.careerWAR ?? 0).toFixed(1)}
                   </td>
-                  <td className="px-4 py-3">{formatSalary(p.salary)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td>{formatSalary(p.salary)}</td>
+                  <td className="text-right">
                     {p.onMyRoster && !draftReady && !locked ? (
                       <button
                         className="btn btn-danger !py-1.5 !px-3 !text-xs"
@@ -202,7 +200,7 @@ export function DraftBoard({
                         Drop
                       </button>
                     ) : p.takenBy ? (
-                      <span className="text-xs uppercase tracking-[0.12em] text-[var(--fog)]">
+                      <span className="font-[family-name:var(--font-display)] text-xs tracking-[0.12em] uppercase text-[var(--fog)]">
                         {p.takenBy}
                       </span>
                     ) : !draftReady && !locked ? (
@@ -224,7 +222,7 @@ export function DraftBoard({
         </table>
       </div>
 
-      <div className="text-xs text-[var(--fog)]">Page {page}</div>
+      <div className="text-sm text-[var(--fog)]">Page {page}</div>
     </div>
   );
 }

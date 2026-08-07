@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { CreateLeagueForm, JoinLeagueForm } from "@/components/LeagueForms";
+import { ClubhouseActions } from "@/components/ClubhouseActions";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { dynastyEraById } from "@/lib/environment";
 import { formatRecord } from "@/lib/format";
 
 export default async function ClubhousePage() {
@@ -17,66 +18,61 @@ export default async function ClubhousePage() {
   });
 
   return (
-    <div className="min-h-screen">
+    <div className="page-shell">
       <AppHeader user={session} />
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <div className="mb-10">
+      <main className="mx-auto max-w-3xl px-5 py-12 sm:py-16">
+        <header className="mb-10">
           <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide sm:text-6xl">
             Clubhouse
           </h1>
-          <p className="mt-2 max-w-xl text-[var(--fog)]">
-            Create a private league, claim a city slot (BOS, LANL, NYAL…), and
-            share the invite code. City codes only — no nicknames or logos.
+          <p className="mt-3 max-w-lg text-[var(--fog)] leading-relaxed">
+            Your private leagues. Pick an era, claim a city slot, invite the crew.
           </p>
-        </div>
+        </header>
 
         {teams.length > 0 ? (
-          <section className="mb-12">
-            <h2 className="mb-4 font-[family-name:var(--font-display)] text-2xl tracking-wide text-[var(--foul)]">
+          <section>
+            <h2 className="mb-2 font-[family-name:var(--font-display)] text-sm tracking-[0.18em] text-[var(--foul)] uppercase">
               Your leagues
             </h2>
-            <div className="grid gap-3">
-              {teams.map((team) => (
-                <Link
-                  key={team.id}
-                  href={`/league/${team.leagueId}`}
-                  className="scoreboard flex flex-col gap-2 px-5 py-4 transition hover:border-[rgba(230,195,92,0.35)] sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <div className="font-[family-name:var(--font-display)] text-2xl tracking-wide">
-                      {team.league.name}
+            <div className="border-t border-[var(--line)]">
+              {teams.map((team) => {
+                const era = dynastyEraById(team.league.era);
+                return (
+                  <Link
+                    key={team.id}
+                    href={`/league/${team.leagueId}`}
+                    className="league-row"
+                  >
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                      <div>
+                        <div className="font-[family-name:var(--font-display)] text-2xl tracking-wide sm:text-3xl">
+                          {team.league.name}
+                        </div>
+                        <div className="mt-1 text-sm text-[var(--fog)]">
+                          {team.abbreviation} · {era.label}
+                        </div>
+                      </div>
+                      <div className="font-[family-name:var(--font-display)] text-sm tracking-[0.12em] uppercase text-[var(--fog)]">
+                        {team.league.status}
+                        {team.league.status === "season" ||
+                        team.league.status === "complete"
+                          ? ` · ${formatRecord(team.wins, team.losses)}`
+                          : ""}
+                      </div>
                     </div>
-                    <div className="text-sm text-[var(--fog)]">
-                      {team.name} ({team.abbreviation}) · {team.park}
-                    </div>
-                  </div>
-                  <div className="text-sm uppercase tracking-[0.15em] text-[var(--fog)]">
-                    {team.league.status}
-                    {team.league.status === "season" ||
-                    team.league.status === "complete"
-                      ? ` · ${formatRecord(team.wins, team.losses)}`
-                      : ""}
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </section>
-        ) : null}
+        ) : (
+          <p className="border-t border-[var(--line)] pt-6 text-[var(--fog)]">
+            No leagues yet — create one or join with an invite code.
+          </p>
+        )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <section className="scoreboard p-6">
-            <h2 className="mb-4 font-[family-name:var(--font-display)] text-3xl tracking-wide">
-              Create a league
-            </h2>
-            <CreateLeagueForm />
-          </section>
-          <section className="scoreboard p-6">
-            <h2 className="mb-4 font-[family-name:var(--font-display)] text-3xl tracking-wide">
-              Join with code
-            </h2>
-            <JoinLeagueForm />
-          </section>
-        </div>
+        <ClubhouseActions hasLeagues={teams.length > 0} />
       </main>
     </div>
   );

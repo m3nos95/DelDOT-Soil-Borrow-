@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bebas_Neue, Manrope, Pixelify_Sans } from "next/font/google";
+import { Bebas_Neue, Pixelify_Sans, Sora } from "next/font/google";
 import "./globals.css";
 
 const display = Bebas_Neue({
@@ -8,7 +8,7 @@ const display = Bebas_Neue({
   variable: "--font-display",
 });
 
-const body = Manrope({
+const body = Sora({
   subsets: ["latin"],
   variable: "--font-body",
 });
@@ -21,7 +21,7 @@ const pixel = Pixelify_Sans({
 export const metadata: Metadata = {
   title: "Hardball — Private Historical Fantasy Baseball",
   description:
-    "Draft legends, set your lineup, and sim seasons with your friends.",
+    "Draft legends by era, set your lineup, and sim seasons with your friends.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

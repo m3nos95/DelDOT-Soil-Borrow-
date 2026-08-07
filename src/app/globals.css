@@ -1,21 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #071410;
-  --field: #0f2a1f;
-  --grass: #1a4a32;
-  --chalk: #f0ebe0;
-  --fog: #c9c2b3;
-  --clay: #c45c26;
-  --foul: #e6c35c;
-  --seam: #b91c1c;
-  --board: #0a1f17;
-  --line: rgba(240, 235, 224, 0.14);
-  --glow: rgba(230, 195, 92, 0.35);
+  --ink: #050d0a;
+  --field: #0c2218;
+  --grass: #163c28;
+  --chalk: #f3efe4;
+  --fog: #a8b0a4;
+  --clay: #b85a28;
+  --foul: #e8b84a;
+  --seam: #c23b3b;
+  --board: #0a1812;
+  --line: rgba(243, 239, 228, 0.12);
+  --glow: rgba(232, 184, 74, 0.28);
   --background: var(--ink);
   --foreground: var(--chalk);
   --bit-edge: #f0d060;
   --bit-ui: #101820;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @theme inline {
@@ -47,10 +48,13 @@ body {
   margin: 0;
   color: var(--chalk);
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(230, 195, 92, 0.12), transparent 55%),
-    radial-gradient(900px 500px at 10% 0%, rgba(26, 74, 50, 0.55), transparent 50%),
-    linear-gradient(180deg, #0a1812 0%, var(--ink) 40%, #040a08 100%);
-  font-family: var(--font-body), system-ui, sans-serif;
+    radial-gradient(ellipse 90% 55% at 70% -15%, rgba(232, 184, 74, 0.1), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 0% 20%, rgba(22, 60, 40, 0.55), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 100% 80%, rgba(184, 90, 40, 0.08), transparent 45%),
+    linear-gradient(180deg, #081610 0%, var(--ink) 45%, #030806 100%);
+  font-family: var(--font-body), Georgia, serif;
+  font-feature-settings: "ss01" on;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -59,39 +63,84 @@ a {
 }
 
 ::selection {
-  background: rgba(230, 195, 92, 0.35);
+  background: rgba(232, 184, 74, 0.35);
   color: var(--chalk);
 }
 
+/* Atmosphere */
 .diamond-grid {
   background-image:
     linear-gradient(var(--line) 1px, transparent 1px),
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 20%, transparent 72%);
+}
+
+.page-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.page-shell::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.35;
+  background:
+    radial-gradient(ellipse 50% 30% at 50% 0%, rgba(232, 184, 74, 0.08), transparent),
+    linear-gradient(180deg, transparent 60%, rgba(0, 0, 0, 0.35));
+}
+
+.page-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Interactive surfaces only — not decorative cards */
+.panel {
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
 }
 
 .scoreboard {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 50%),
     var(--board);
   border: 1px solid var(--line);
 }
 
+.league-row {
+  display: block;
+  border-bottom: 1px solid var(--line);
+  padding: 1.15rem 0;
+  transition: color 180ms var(--ease), padding 180ms var(--ease);
+}
+
+.league-row:hover {
+  color: var(--foul);
+  padding-left: 0.35rem;
+}
+
+/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   border: 1px solid transparent;
-  border-radius: 2px;
-  padding: 0.75rem 1.25rem;
+  border-radius: 0;
+  padding: 0.85rem 1.4rem;
   font-family: var(--font-display), sans-serif;
   font-size: 1.05rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition:
+    transform 160ms var(--ease),
+    background 160ms var(--ease),
+    border-color 160ms var(--ease),
+    color 160ms var(--ease);
 }
 
 .btn:hover {
@@ -102,14 +151,19 @@ a {
   transform: translateY(0);
 }
 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .btn-primary {
   background: var(--foul);
   color: var(--ink);
-  box-shadow: 0 0 0 1px rgba(230, 195, 92, 0.2), 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
 .btn-primary:hover {
-  background: #f0d070;
+  background: #f0c75c;
 }
 
 .btn-ghost {
@@ -119,60 +173,173 @@ a {
 }
 
 .btn-ghost:hover {
-  border-color: rgba(240, 235, 224, 0.35);
-  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(243, 239, 228, 0.4);
+  color: var(--foul);
 }
 
 .btn-danger {
   background: transparent;
-  border-color: rgba(185, 28, 28, 0.5);
-  color: #fca5a5;
+  border-color: rgba(194, 59, 59, 0.45);
+  color: #f0a8a8;
 }
 
+.btn-danger:hover {
+  border-color: rgba(194, 59, 59, 0.8);
+}
+
+/* Forms */
 .field-input {
   width: 100%;
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.28);
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
   color: var(--chalk);
-  border-radius: 2px;
-  padding: 0.8rem 0.9rem;
+  border-radius: 0;
+  padding: 0.85rem 0;
   outline: none;
+  font-family: var(--font-body), Georgia, serif;
+  font-size: 1.05rem;
+  transition: border-color 160ms var(--ease);
 }
 
 .field-input:focus {
-  border-color: rgba(230, 195, 92, 0.55);
-  box-shadow: 0 0 0 3px var(--glow);
+  border-bottom-color: var(--foul);
+}
+
+select.field-input {
+  cursor: pointer;
+  background: transparent;
 }
 
 .field-label {
   display: block;
-  margin-bottom: 0.4rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.12em;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fog);
 }
 
+/* Nav */
+.site-header {
+  border-bottom: 1px solid var(--line);
+  background: rgba(5, 13, 10, 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.league-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 2rem;
+}
+
+.league-tab {
+  position: relative;
+  padding: 0.85rem 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fog);
+  transition: color 160ms var(--ease);
+}
+
+.league-tab:hover {
+  color: var(--chalk);
+}
+
+.league-tab[data-active="true"] {
+  color: var(--foul);
+}
+
+.league-tab[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--foul);
+}
+
+.chip-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip-tab {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--line);
+  color: var(--fog);
+  background: transparent;
+  transition: border-color 160ms var(--ease), color 160ms var(--ease);
+}
+
+.chip-tab:hover {
+  color: var(--chalk);
+  border-color: rgba(243, 239, 228, 0.3);
+}
+
+.chip-tab[data-active="true"] {
+  color: var(--ink);
+  background: var(--foul);
+  border-color: var(--foul);
+}
+
+/* Motion */
 .fade-up {
-  animation: fadeUp 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fadeUp 800ms var(--ease) both;
 }
 
 .fade-up-delay {
-  animation: fadeUp 800ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  animation: fadeUp 850ms var(--ease) 140ms both;
 }
 
 .fade-up-delay-2 {
-  animation: fadeUp 900ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both;
+  animation: fadeUp 900ms var(--ease) 260ms both;
+}
+
+.hero-drift {
+  animation: heroDrift 18s ease-in-out infinite alternate;
 }
 
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(22px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes heroDrift {
+  from {
+    transform: scale(1) translateY(0);
+  }
+  to {
+    transform: scale(1.04) translateY(-1.5%);
+  }
+}
+
+@keyframes sweep {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scaleX(0.35);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1);
   }
 }
 
@@ -185,29 +352,41 @@ a {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -8px;
+  bottom: -10px;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--foul), transparent);
-  animation: sweep 2.8s ease-in-out infinite;
-}
-
-@keyframes sweep {
-  0%,
-  100% {
-    opacity: 0.25;
-    transform: scaleX(0.4);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
+  animation: sweep 3.2s ease-in-out infinite;
 }
 
 .table-row:hover {
   background: rgba(255, 255, 255, 0.03);
 }
 
-/* —— Retro Gamecast —— */
+.draft-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.draft-table th {
+  text-align: left;
+  padding: 0.65rem 0.5rem;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fog);
+  border-bottom: 1px solid var(--line);
+  font-weight: 400;
+}
+
+.draft-table td {
+  padding: 0.85rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+/* —— Retro Gamecast (kept) —— */
 .gc-root {
   --gc-font: var(--font-pixel), ui-monospace, monospace;
 }
@@ -234,8 +413,7 @@ a {
   border: 4px solid var(--bit-edge);
   box-shadow:
     0 0 0 3px #5a4010,
-    0 12px 0 #0a0c10,
-    0 0 40px rgba(240, 208, 96, 0.12);
+    0 12px 0 #0a0c10;
   padding: 0.75rem;
   image-rendering: pixelated;
 }
@@ -255,9 +433,7 @@ a {
 .gc-root.bit64 .gc-cart {
   border-width: 2px;
   border-radius: 10px;
-  box-shadow:
-    0 0 0 1px rgba(240, 208, 96, 0.35),
-    0 18px 40px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 1px rgba(240, 208, 96, 0.35);
   image-rendering: auto;
 }
 .gc-root.bit64 .gc-cart::before {
@@ -302,7 +478,7 @@ a {
 }
 .gc-root.bit64 .gc-score {
   font-family: var(--font-display), sans-serif;
-  text-shadow: 0 2px 8px rgba(240, 208, 96, 0.35);
+  text-shadow: none;
 }
 
 .gc-mid {
@@ -332,7 +508,6 @@ a {
 }
 .gc-outs span.on {
   background: var(--bit-edge);
-  box-shadow: 0 0 8px rgba(240, 208, 96, 0.55);
 }
 
 .gc-field-wrap {
@@ -402,7 +577,7 @@ a {
   animation: gcPlayIn 0.28s steps(3);
 }
 .gc-root.bit64 .gc-play {
-  font-family: var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-body), Georgia, serif;
   text-shadow: none;
   font-size: 1.05rem;
   animation: gcPlayIn 0.35s ease;

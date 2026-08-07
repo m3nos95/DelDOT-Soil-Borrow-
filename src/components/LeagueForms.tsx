@@ -17,7 +17,7 @@ export function CreateLeagueForm() {
   const era = DYNASTY_ERAS.find((e) => e.id === eraId) ?? DYNASTY_ERAS[3];
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-6">
       <div>
         <label className="field-label" htmlFor="name">
           League name
@@ -46,21 +46,16 @@ export function CreateLeagueForm() {
           {DYNASTY_ERAS.map((e) => (
             <option key={e.id} value={e.id}>
               {e.label}
-              {e.id === "open" ? " — chaos" : ` (${e.yearFrom}–${e.yearTo})`}
+              {e.id === "open" ? "" : ` · ${e.yearFrom}–${e.yearTo}`}
             </option>
           ))}
         </select>
         <p className="mt-2 text-sm text-[var(--fog)]">{era.blurb}</p>
-        <p className="mt-1 text-xs text-[var(--fog)]">
-          Draft pool is locked to this window so rates stay apples-to-apples.
-          Locked at creation — can&apos;t mix Greene and Ruth unless you pick
-          All-time.
-        </p>
       </div>
 
       <FranchisePicker />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-2">
         <div>
           <label className="field-label" htmlFor="maxTeams">
             Max teams
@@ -96,8 +91,8 @@ export function CreateLeagueForm() {
           </select>
         </div>
       </div>
-      {state.error ? <p className="text-sm text-red-300">{state.error}</p> : null}
-      <button className="btn btn-primary w-full" disabled={pending}>
+      {state.error ? <p className="text-sm text-[#f0a8a8]">{state.error}</p> : null}
+      <button className="btn btn-primary" disabled={pending}>
         {pending ? "Creating…" : "Create league"}
       </button>
     </form>
@@ -107,7 +102,7 @@ export function CreateLeagueForm() {
 export function JoinLeagueForm({ takenCodes = [] }: { takenCodes?: string[] }) {
   const [state, action, pending] = useActionState(joinLeagueAction, initial);
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-6">
       <div>
         <label className="field-label" htmlFor="inviteCode">
           Invite code
@@ -115,18 +110,15 @@ export function JoinLeagueForm({ takenCodes = [] }: { takenCodes?: string[] }) {
         <input
           id="inviteCode"
           name="inviteCode"
-          className="field-input font-mono uppercase"
+          className="field-input"
           required
-          placeholder="AB12CD"
-          autoComplete="off"
-          spellCheck={false}
+          autoCapitalize="characters"
+          placeholder="ABC123"
         />
       </div>
-
       <FranchisePicker takenCodes={takenCodes} />
-
-      {state.error ? <p className="text-sm text-red-300">{state.error}</p> : null}
-      <button className="btn btn-primary w-full" disabled={pending}>
+      {state.error ? <p className="text-sm text-[#f0a8a8]">{state.error}</p> : null}
+      <button className="btn btn-primary" disabled={pending}>
         {pending ? "Joining…" : "Join league"}
       </button>
     </form>

@@ -1,11 +1,18 @@
-import Link from "next/link";
+"use client";
 
-const links = [
-  { href: "", label: "Overview" },
-  { href: "/draft", label: "Draft" },
-  { href: "/team", label: "Lineup" },
-  { href: "/standings", label: "Standings" },
-];
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const LINKS = [
+  { href: "", label: "Overview", statuses: ["drafting", "season", "complete", "forming"] },
+  { href: "/draft", label: "Draft", statuses: ["drafting"] },
+  { href: "/team", label: "Lineup", statuses: ["drafting", "season", "complete"] },
+  {
+    href: "/standings",
+    label: "Standings",
+    statuses: ["season", "complete"],
+  },
+] as const;
 
 export function LeagueNav({
   leagueId,
@@ -14,24 +21,31 @@ export function LeagueNav({
   leagueId: string;
   status: string;
 }) {
-  const visible =
-    status === "drafting"
-      ? links.filter((l) => l.href !== "/standings")
-      : status === "forming"
-        ? links.filter((l) => !l.href || l.href === "/draft")
-        : links.filter((l) => l.href !== "/draft");
+  const pathname = usePathname();
+  const base = `/league/${leagueId}`;
+  const items = LINKS.filter((l) =>
+    (l.statuses as readonly string[]).includes(status),
+  );
 
   return (
-    <nav className="mb-8 flex flex-wrap gap-2 border-b border-[var(--line)] pb-3">
-      {visible.map((link) => (
-        <Link
-          key={link.href || "overview"}
-          href={`/league/${leagueId}${link.href}`}
-          className="px-3 py-1.5 text-sm uppercase tracking-[0.14em] text-[var(--fog)] transition hover:text-[var(--foul)]"
-        >
-          {link.label}
-        </Link>
-      ))}
+    <nav className="league-tabs" aria-label="League">
+      {items.map((item) => {
+        const href = `${base}${item.href}`;
+        const active =
+          item.href === ""
+            ? pathname === base
+            : pathname.startsWith(href);
+        return (
+          <Link
+            key={item.href || "overview"}
+            href={href}
+            className="league-tab"
+            data-active={active}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }

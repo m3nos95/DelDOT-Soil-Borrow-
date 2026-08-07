@@ -113,19 +113,17 @@ export default async function DraftPage({
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="min-h-screen">
+    <div className="page-shell">
       <AppHeader user={session} leagueName={league.name} />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-5 py-8 sm:py-10">
         <h1 className="mb-1 font-[family-name:var(--font-display)] text-5xl tracking-wide">
-          Draft board
+          Draft
         </h1>
         <p className="mb-6 text-[var(--fog)]">
-          Era lock: <span className="text-[var(--foul)]">{era.label}</span>
-          {era.id !== "open"
-            ? ` (${era.yearFrom}–${era.yearTo})`
-            : ""}{" "}
-          · {poolCount.toLocaleString()} eligible career cards · one card per
-          player, no season splits.
+          <span className="text-[var(--foul)]">{era.label}</span>
+          {era.id !== "open" ? ` · ${era.yearFrom}–${era.yearTo}` : ""}
+          {" · "}
+          {poolCount.toLocaleString()} career cards
         </p>
         <LeagueNav leagueId={id} status={league.status} />
         <DraftBoard

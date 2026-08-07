@@ -49,60 +49,63 @@ export default async function LeaguePage({
     where: { leagueId: id, status: "scheduled" },
   });
 
+  const era = dynastyEraById(league.era);
+
   return (
-    <div className="min-h-screen">
+    <div className="page-shell">
       <AppHeader user={session} leagueName={league.name} />
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <main className="mx-auto max-w-6xl px-5 py-8 sm:py-10">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide">
+            <p className="mb-1 font-[family-name:var(--font-display)] text-sm tracking-[0.18em] uppercase text-[var(--foul)]">
+              {league.status}
+            </p>
+            <h1 className="font-[family-name:var(--font-display)] text-5xl tracking-wide sm:text-6xl">
               {league.name}
             </h1>
-            <p className="mt-1 text-sm text-[var(--fog)]">
-              Invite code{" "}
-              <span className="inline-flex items-center rounded-sm border border-[var(--line)] bg-black/30 px-2 py-0.5 font-mono text-[var(--foul)]">
+            <p className="mt-2 text-sm text-[var(--fog)]">
+              Invite{" "}
+              <span className="font-mono text-[var(--foul)]">
                 {league.inviteCode}
-              </span>{" "}
-              · {dynastyEraById(league.era).label}
-              {league.era !== "open"
-                ? ` (${dynastyEraById(league.era).yearFrom}–${dynastyEraById(league.era).yearTo})`
-                : ""}{" "}
-              · {league.teams.length}/{league.maxTeams} teams ·{" "}
-              {formatSalary(league.salaryCap)} cap
+              </span>
+              {" · "}
+              {era.label}
+              {era.id !== "open" ? ` ${era.yearFrom}–${era.yearTo}` : ""}
+              {" · "}
+              {league.teams.length}/{league.maxTeams} teams
+              {" · "}
+              {formatSalary(league.salaryCap)}
             </p>
-          </div>
-          <div className="text-xs uppercase tracking-[0.2em] text-[var(--fog)]">
-            Status: {league.status}
           </div>
         </div>
 
         <LeagueNav leagueId={id} status={league.status} />
 
         {league.status === "drafting" ? (
-          <section className="mb-10 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="scoreboard p-6">
-              <h2 className="mb-3 font-[family-name:var(--font-display)] text-3xl tracking-wide">
+          <section className="mb-12 grid gap-10 lg:grid-cols-2">
+            <div className="panel">
+              <h2 className="mb-2 font-[family-name:var(--font-display)] text-3xl tracking-wide">
                 Draft room
               </h2>
-              <p className="mb-4 text-[var(--fog)]">
-                Build a 25-man roster under the salary cap. Need at least 10
-                hitters and 6 pitchers before you lock.
+              <p className="mb-5 text-[var(--fog)]">
+                25-man roster under the cap. Lock when you have at least 10
+                hitters and 6 pitchers.
               </p>
               <Link href={`/league/${id}/draft`} className="btn btn-primary">
-                Open draft board
+                Open draft
               </Link>
             </div>
-            <div className="scoreboard p-6">
+            <div className="panel">
               <h2 className="mb-3 font-[family-name:var(--font-display)] text-3xl tracking-wide">
                 Ready check
               </h2>
-              <ul className="mb-4 space-y-2 text-sm">
+              <ul className="mb-5 space-y-2 text-sm">
                 {league.teams.map((t) => (
-                  <li key={t.id} className="flex justify-between gap-3">
+                  <li key={t.id} className="flex justify-between gap-3 border-b border-[var(--line)] py-2">
                     <span>
-                      {t.name}{" "}
+                      {t.abbreviation}{" "}
                       <span className="text-[var(--fog)]">
-                        ({t.owner.displayName})
+                        {t.owner.displayName}
                       </span>
                     </span>
                     <span
@@ -110,9 +113,7 @@ export default async function LeaguePage({
                         t.draftReady ? "text-[var(--foul)]" : "text-[var(--fog)]"
                       }
                     >
-                      {t.draftReady
-                        ? "LOCKED"
-                        : `${t.roster.length} players`}
+                      {t.draftReady ? "LOCKED" : `${t.roster.length} players`}
                     </span>
                   </li>
                 ))}
@@ -121,7 +122,7 @@ export default async function LeaguePage({
                 <CommissionerStart leagueId={id} canStart={allReady} />
               ) : (
                 <p className="text-sm text-[var(--fog)]">
-                  Commissioner starts the season when everyone is locked.
+                  Commissioner starts when everyone locks.
                 </p>
               )}
             </div>
@@ -129,20 +130,20 @@ export default async function LeaguePage({
         ) : null}
 
         {league.status === "season" || league.status === "complete" ? (
-          <section className="mb-10 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="scoreboard p-6">
+          <section className="mb-12 grid gap-10 lg:grid-cols-2">
+            <div className="panel">
               <h2 className="mb-3 font-[family-name:var(--font-display)] text-3xl tracking-wide">
                 Standings
               </h2>
-              <div className="space-y-2">
+              <div>
                 {league.teams.map((t, i) => (
                   <div
                     key={t.id}
-                    className="flex items-center justify-between border-b border-[var(--line)] py-2 text-sm"
+                    className="flex items-center justify-between border-b border-[var(--line)] py-2.5 text-sm"
                   >
                     <div>
                       <span className="mr-2 text-[var(--fog)]">{i + 1}.</span>
-                      {t.name}
+                      {t.abbreviation}
                       {t.id === myTeam?.id ? (
                         <span className="ml-2 text-[var(--foul)]">you</span>
                       ) : null}
@@ -158,15 +159,15 @@ export default async function LeaguePage({
               </div>
               <Link
                 href={`/league/${id}/standings`}
-                className="mt-4 inline-block text-sm text-[var(--foul)]"
+                className="mt-4 inline-block text-sm text-[var(--foul)] hover:underline"
               >
-                Full standings & schedule →
+                Full schedule →
               </Link>
             </div>
-            <div className="scoreboard p-6">
+            <div className="panel">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="font-[family-name:var(--font-display)] text-3xl tracking-wide">
-                  {league.status === "complete" ? "Final results" : "Play ball"}
+                  {league.status === "complete" ? "Results" : "Play ball"}
                 </h2>
                 {league.status === "season" && nextDay ? (
                   <SimDayButton leagueId={id} />
@@ -174,22 +175,22 @@ export default async function LeaguePage({
               </div>
               {league.status === "season" ? (
                 <p className="mb-4 text-sm text-[var(--fog)]">
-                  Next: Day {nextDay?.dayNumber ?? "—"} · {remaining} games left
+                  Day {nextDay?.dayNumber ?? "—"} next · {remaining} games left
                 </p>
               ) : (
                 <p className="mb-4 text-sm text-[var(--foul)]">Season complete.</p>
               )}
-              <div className="space-y-2">
+              <div>
                 {league.games.length === 0 ? (
                   <p className="text-sm text-[var(--fog)]">
-                    No games played yet. Hit sim next day.
+                    No games yet — sim the next day.
                   </p>
                 ) : (
                   league.games.map((g) => (
                     <Link
                       key={g.id}
                       href={`/league/${id}/game/${g.id}`}
-                      className="flex items-center justify-between border-b border-[var(--line)] py-2 text-sm transition hover:text-[var(--foul)]"
+                      className="flex items-center justify-between border-b border-[var(--line)] py-2.5 text-sm transition hover:text-[var(--foul)]"
                     >
                       <span>
                         {g.awayTeam.abbreviation} {g.awayScore} @{" "}
@@ -205,11 +206,11 @@ export default async function LeaguePage({
         ) : null}
 
         {myTeam ? (
-          <section className="scoreboard p-6">
-            <h2 className="mb-2 font-[family-name:var(--font-display)] text-3xl tracking-wide">
+          <section className="panel">
+            <h2 className="mb-1 font-[family-name:var(--font-display)] text-3xl tracking-wide">
               {myTeam.name}
             </h2>
-            <p className="mb-4 text-sm text-[var(--fog)]">
+            <p className="mb-5 text-sm text-[var(--fog)]">
               {myTeam.park} · Payroll{" "}
               {formatSalary(
                 myTeam.roster.reduce((s, r) => s + r.player.salary, 0),
