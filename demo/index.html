@@ -457,7 +457,7 @@
     <p class="tag">Local HTML demo · no server</p>
     <p class="lede">
       Pick two city clubs, then watch the game unfold on a diamond — Gamecast-style, play by play.
-      Platoon, stamina, and bullpen are live. Full draft leagues come with the Next.js app.
+      Platoon, pen, park, gloves, and baserunning are live. Full draft leagues come with the Next.js app.
     </p>
 
     <div class="panel">
@@ -625,6 +625,7 @@
 
     function toSimPlayer(raw) {
       const speed = HardballSim.deriveSpeed(raw);
+      const defense = HardballSim.deriveDefense(raw);
       return {
         id: String(raw.fangraphsId),
         name: raw.name,
@@ -643,6 +644,7 @@
         control: raw.control,
         durability: raw.durability ?? 50,
         speed,
+        defense,
       };
     }
 
@@ -1110,6 +1112,7 @@
         homeLineup: home.lineupEntries,
         awayStaff: away.staff,
         homeStaff: home.staff,
+        park: HardballSim.parkForCode(homeCode),
         seed,
       });
 

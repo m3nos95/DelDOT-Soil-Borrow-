@@ -1,7 +1,8 @@
 import { customAlphabet } from "nanoid";
 import { prisma } from "./db";
+import { parkForCode } from "./environment";
 import type { Hand, SimPlayer, LineupEntry, StaffArm, BullpenRole } from "./sim";
-import { deriveSpeed, simulateGame } from "./sim";
+import { deriveDefense, deriveSpeed, simulateGame } from "./sim";
 
 export { PARKS } from "./constants";
 
@@ -50,6 +51,7 @@ function toSimPlayer(p: {
   stuff: number;
   control: number;
   durability?: number;
+  careerWAR?: number;
 }): SimPlayer {
   return {
     id: p.id,
@@ -69,6 +71,7 @@ function toSimPlayer(p: {
     control: p.control,
     durability: p.durability ?? 50,
     speed: deriveSpeed(p),
+    defense: deriveDefense(p),
   };
 }
 
@@ -298,6 +301,7 @@ export async function simulateScheduledGame(gameId: string) {
     awayLineup: away.lineupEntries,
     homeStaff: home.staff,
     awayStaff: away.staff,
+    park: parkForCode(game.homeTeam.abbreviation),
     seed:
       game.dayNumber * 10007 +
       game.homeTeamId.charCodeAt(0) * 97 +

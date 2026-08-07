@@ -5,7 +5,25 @@
  * - L/R platoon (Randy Johnson vs lefty stacks hurts)
  * - SP stamina → real bullpen usage (short SP without RP collapses)
  * - Lineup sequencing (Rickey on, three Ks behind = stranded runs)
+ * - Park / era climate, defense → BABIP, speed-based advancement
  */
+
+import {
+  ERAS,
+  NEUTRAL_PARK,
+  type EraEnv,
+  type ParkFactors,
+} from "./environment";
+
+export {
+  ERAS,
+  NEUTRAL_PARK,
+  PARK_BY_CODE,
+  eraById,
+  parkForCode,
+  type EraEnv,
+  type ParkFactors,
+} from "./environment";
 
 export type Hand = "L" | "R" | "S";
 
@@ -26,8 +44,10 @@ export type SimPlayer = {
   stuff: number;
   control: number;
   durability: number;
-  /** 0–100 speed; drives SB / GIDP avoidance */
+  /** 0–100 speed; drives SB / GIDP avoidance / extra bases */
   speed: number;
+  /** 0–100 glove; suppresses BIP hits when fielding */
+  defense: number;
 };
 
 export type LineupEntry = {
@@ -132,6 +152,42 @@ export function deriveSpeed(p: {
   return clamp(28 + p.tripleRate * 3.2 - p.hrRate * 0.15, 20, 96);
 }
 
+/** Position + light WAR bump — no defensive metrics in the FG card yet. */
+export function deriveDefense(p: {
+  primaryPos: string;
+  isPitcher?: boolean;
+  careerWAR?: number;
+}): number {
+  if (p.isPitcher) return 40;
+  const base: Record<string, number> = {
+    C: 56,
+    SS: 64,
+    CF: 62,
+    "2B": 58,
+    "3B": 54,
+    LF: 48,
+    RF: 48,
+    OF: 52,
+    "1B": 40,
+    DH: 28,
+    UTIL: 50,
+    P: 40,
+  };
+  let d = base[p.primaryPos] ?? 50;
+  if (p.careerWAR != null) {
+    d += clamp((p.careerWAR - 25) * 0.12, -8, 10);
+  }
+  return clamp(d, 20, 90);
+}
+
+/** Average glove of the 8 fielders (skip DH). */
+export function lineupDefense(lineup: LineupEntry[]): number {
+  const fielders = lineup.filter((e) => e.position !== "DH");
+  if (fielders.length === 0) return 50;
+  const sum = fielders.reduce((s, e) => s + (e.player.defense ?? 50), 0);
+  return sum / fielders.length;
+}
+
 function emptyBatter(p: SimPlayer): BatterBox {
   return {
     playerId: p.id,
@@ -206,27 +262,79 @@ function fatigueFactor(arm: LiveArm): number {
   return 1 + over * 0.06;
 }
 
+type PaClimate = {
+  park: ParkFactors;
+  era: EraEnv;
+  /** Fielding team glove average */
+  defense: number;
+  /** Small home-field bump when batting at home */
+  homeBat: boolean;
+};
+
 function resolvePa(
   batter: SimPlayer,
   arm: LiveArm,
   bases: BaseOccupant[],
   outs: number,
   rand: () => number,
+  climate: PaClimate,
 ): Outcome {
   const pitcher = arm.player;
   const platoon = platoonOffenseFactor(batter, pitcher);
   const fatigue = fatigueFactor(arm);
   const stuffMod = (pitcher.stuff - 50) / 100;
   const controlMod = (pitcher.control - 50) / 100;
+  const { park, era } = climate;
+  // Elite gloves turn BIP into outs; poor gloves inflate singles/doubles
+  const glove = 1 - (climate.defense - 50) / 220;
+  const hfa = climate.homeBat ? 1.03 : 1;
 
   // Offense scaled by platoon; pitcher fatigue makes contact/power easier
-  let k = batter.kRate * (1 + stuffMod * 0.6) * (2 - platoon) * (1.05 - (fatigue - 1) * 0.35);
-  let bb = batter.bbRate * (1 - controlMod * 0.65) * platoon * (0.95 + (fatigue - 1) * 0.4);
+  let k =
+    batter.kRate *
+    (1 + stuffMod * 0.6) *
+    (2 - platoon) *
+    (1.05 - (fatigue - 1) * 0.35) *
+    era.k;
+  let bb =
+    batter.bbRate *
+    (1 - controlMod * 0.65) *
+    platoon *
+    (0.95 + (fatigue - 1) * 0.4) *
+    era.bb *
+    hfa;
   let hbp = batter.hbpRate * (1 + (fatigue - 1) * 0.2);
-  let single = batter.singleRate * (1 - stuffMod * 0.22) * platoon * fatigue;
-  let double = batter.doubleRate * (1 - stuffMod * 0.18) * platoon * fatigue;
-  let triple = batter.tripleRate * platoon;
-  let hr = batter.hrRate * (1 - stuffMod * 0.32) * platoon * (0.9 + (fatigue - 1) * 0.5);
+  let single =
+    batter.singleRate *
+    (1 - stuffMod * 0.22) *
+    platoon *
+    fatigue *
+    park.hit *
+    era.babip *
+    glove *
+    hfa *
+    park.run;
+  let double =
+    batter.doubleRate *
+    (1 - stuffMod * 0.18) *
+    platoon *
+    fatigue *
+    park.hit *
+    era.babip *
+    glove *
+    hfa *
+    park.run;
+  let triple =
+    batter.tripleRate * platoon * park.hit * era.babip * glove * park.run;
+  let hr =
+    batter.hrRate *
+    (1 - stuffMod * 0.32) *
+    platoon *
+    (0.9 + (fatigue - 1) * 0.5) *
+    park.hr *
+    era.hr *
+    hfa *
+    Math.sqrt(park.run);
 
   // With RISP, contact hitters drive runs in; K machines strand them
   const risp = Boolean(bases[1] || bases[2]);
@@ -241,20 +349,24 @@ function resolvePa(
   k = clamp(k, 60, 450);
   bb = clamp(bb, 25, 240);
   hbp = clamp(hbp, 1, 35);
-  single = clamp(single, 60, 260);
-  double = clamp(double, 15, 100);
-  triple = clamp(triple, 1, 30);
-  hr = clamp(hr, 3, 130);
+  single = clamp(single, 50, 280);
+  double = clamp(double, 12, 110);
+  triple = clamp(triple, 1, 32);
+  hr = clamp(hr, 2, 145);
 
   const contact = single + double + triple + hr;
   const nonOut = k + bb + hbp + contact;
   let out = Math.max(200, 1000 - nonOut);
+  // Defense steals hits → more outs on BIP
+  out *= clamp(1 + (climate.defense - 50) / 180, 0.85, 1.2);
 
   // GIDP risk: runner on 1st, < 2 outs, slow batters
   let gidp = 0;
   if (bases[0] && !bases[1] && outs < 2) {
     const slow = (100 - batter.speed) / 100;
-    gidp = clamp(18 + slow * 55 + batter.hrRate * 0.08, 10, 90);
+    // Better infields (proxy via team defense) turn more twin killings
+    const dpGlove = clamp(1 + (climate.defense - 50) / 140, 0.85, 1.25);
+    gidp = clamp(18 + slow * 55 + batter.hrRate * 0.08, 10, 90) * dpGlove;
     out = Math.max(120, out - gidp);
   }
 
@@ -279,26 +391,96 @@ function resolvePa(
   return "OUT";
 }
 
-function advanceBases(
+/**
+ * Probabilistic advancement — speed decides first-to-third, score-from-2nd
+ * on a single, score-from-1st on a double, etc.
+ */
+function advanceOnHit(
   bases: BaseOccupant[],
   batter: SimPlayer,
-  basesToAdvance: number,
-): { scored: SimPlayer[]; bases: BaseOccupant[] } {
-  const scored: SimPlayer[] = [];
-  const next: BaseOccupant[] = [null, null, null];
-
-  for (let i = 2; i >= 0; i--) {
-    const runner = bases[i];
-    if (!runner) continue;
-    const dest = i + basesToAdvance;
-    if (dest >= 3) scored.push(runner.player);
-    else next[dest] = runner;
+  hit: 1 | 2 | 3 | 4,
+  rand: () => number,
+): { scored: SimPlayer[]; bases: BaseOccupant[]; note: string } {
+  if (hit >= 4) {
+    const scored = [
+      ...(bases[2] ? [bases[2].player] : []),
+      ...(bases[1] ? [bases[1].player] : []),
+      ...(bases[0] ? [bases[0].player] : []),
+      batter,
+    ];
+    return { scored, bases: [null, null, null], note: "" };
   }
 
-  if (basesToAdvance >= 4) scored.push(batter);
-  else next[basesToAdvance - 1] = { player: batter };
+  const scored: SimPlayer[] = [];
+  const next: BaseOccupant[] = [null, null, null];
+  const bits: string[] = [];
+  const spd = (p: SimPlayer) => p.speed;
 
-  return { scored, bases: next };
+  if (hit === 3) {
+    for (const occ of bases) {
+      if (occ) scored.push(occ.player);
+    }
+    next[2] = { player: batter };
+    return { scored, bases: next, note: "" };
+  }
+
+  if (hit === 2) {
+    if (bases[2]) scored.push(bases[2].player);
+    if (bases[1]) scored.push(bases[1].player);
+    if (bases[0]) {
+      const r = bases[0].player;
+      // Score from first on a double — speed decides
+      const pScore = clamp(0.28 + (spd(r) - 50) * 0.007, 0.18, 0.78);
+      if (rand() < pScore) {
+        scored.push(r);
+        bits.push(`${r.name} scores from first`);
+      } else {
+        next[2] = { player: r };
+      }
+    }
+    next[1] = { player: batter };
+    return { scored, bases: next, note: bits.join("; ") };
+  }
+
+  // Single
+  if (bases[2]) {
+    // Almost always scores; slow trailers rarely held
+    const pScore = clamp(0.88 + (spd(bases[2].player) - 40) * 0.002, 0.75, 0.98);
+    if (rand() < pScore) scored.push(bases[2].player);
+    else next[2] = bases[2];
+  }
+  if (bases[1]) {
+    const r = bases[1].player;
+    const pScore = clamp(0.38 + (spd(r) - 50) * 0.008, 0.22, 0.82);
+    if (rand() < pScore) {
+      scored.push(r);
+      bits.push(`${r.name} scores from second`);
+    } else if (!next[2]) {
+      next[2] = { player: r };
+    } else {
+      // 3B occupied (held) — stay at 2B rare; force score or hold 2B empty→3B taken
+      scored.push(r);
+    }
+  }
+  if (bases[0]) {
+    const r = bases[0].player;
+    // First-to-third on a single when 2B/3B clear enough
+    const laneOpen = !next[2];
+    const pThird = laneOpen
+      ? clamp(0.22 + (spd(r) - 55) * 0.009, 0.08, 0.62)
+      : 0;
+    if (rand() < pThird) {
+      next[2] = { player: r };
+      bits.push(`${r.name} first to third`);
+    } else if (!next[1]) {
+      next[1] = { player: r };
+    } else {
+      // Traffic — hold at first somehow shouldn't happen; squeeze to 2B empty
+      next[1] = { player: r };
+    }
+  }
+  next[0] = { player: batter };
+  return { scored, bases: next, note: bits.join("; ") };
 }
 
 function spTargetOuts(sp: SimPlayer, rand: () => number): number {
@@ -397,10 +579,18 @@ export function simulateGame(opts: {
   homeStaff: StaffArm[];
   awayStaff: StaffArm[];
   seed?: number;
+  /** Home park factors (default neutral) */
+  park?: ParkFactors;
+  /** League era climate (default neutral — career rates as-is) */
+  era?: EraEnv;
 }): GameResult {
   const rand = mulberry32(opts.seed ?? Date.now());
   const playByPlay: PlayEvent[] = [];
   const inningScores: number[] = [];
+  const park = opts.park ?? NEUTRAL_PARK;
+  const era = opts.era ?? ERAS.neutral;
+  const homeGlove = lineupDefense(opts.homeLineup);
+  const awayGlove = lineupDefense(opts.awayLineup);
 
   const awayBatters = new Map(
     opts.awayLineup.map((e) => [e.player.id, emptyBatter(e.player)]),
@@ -630,7 +820,13 @@ export function simulateGame(opts: {
 
       const hand = batterHandVs(batter, arm.player);
       const platoon = platoonOffenseFactor(batter, arm.player);
-      const outcome = resolvePa(batter, arm, bases, outs, rand);
+      const climate: PaClimate = {
+        park,
+        era,
+        defense: fieldingHome ? homeGlove : awayGlove,
+        homeBat: !fieldingHome,
+      };
+      const outcome = resolvePa(batter, arm, bases, outs, rand, climate);
 
       const prevHome = homeScore;
       const prevAway = awayScore;
@@ -727,7 +923,7 @@ export function simulateGame(opts: {
           log(half, `${batter.name} ${kind}.`, { outs, bases });
         }
       } else {
-        const advance =
+        const hit =
           outcome === "1B" ? 1 : outcome === "2B" ? 2 : outcome === "3B" ? 3 : 4;
         box.ab += 1;
         box.h += 1;
@@ -736,11 +932,11 @@ export function simulateGame(opts: {
           box.hr += 1;
           arm.box.hr += 1;
         }
-        const { scored, bases: nextBases } = advanceBases(
-          bases,
-          batter,
-          advance,
-        );
+        const {
+          scored,
+          bases: nextBases,
+          note,
+        } = advanceOnHit(bases, batter, hit as 1 | 2 | 3 | 4, rand);
         bases = nextBases;
         for (const runner of scored) creditRun(runner, true);
         const hitName =
@@ -751,15 +947,13 @@ export function simulateGame(opts: {
               : outcome === "3B"
                 ? "triples"
                 : "homers";
+        let text = `${batter.name} ${hitName}${outcome === "HR" ? "!" : ""}`;
         if (scored.length) {
-          log(
-            half,
-            `${batter.name} ${hitName}${outcome === "HR" ? "!" : ""} — ${scored.length} run${scored.length > 1 ? "s" : ""} score.`,
-            { outs, bases },
-          );
-        } else {
-          log(half, `${batter.name} ${hitName}.`, { outs, bases });
+          text += ` — ${scored.length} run${scored.length > 1 ? "s" : ""} score`;
         }
+        if (note) text += ` (${note})`;
+        text += ".";
+        log(half, text, { outs, bases });
       }
 
       noteLeadChange(fieldingHome, prevHome, prevAway);

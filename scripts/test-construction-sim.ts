@@ -3,7 +3,11 @@
  * 1) Lefty stack vs Randy Johnson gets crushed vs same stack vs soft RHP
  * 2) Short SP + bad pen bleeds late vs short SP + elite pen
  * 3) Rickey + three K guys scores less than Rickey + contact table-setters
+ * 4) Coors scores more than Petco-like parks
+ * 5) Elite gloves suppress runs vs brick gloves
+ * 6) Speed takes extra bases more often
  */
+import { PARK_BY_CODE } from "../src/lib/environment";
 import {
   simulateGame,
   platoonOffenseFactor,
@@ -28,7 +32,7 @@ function bat(
   return {
     id,
     name,
-    primaryPos: "OF",
+    primaryPos: rates.primaryPos ?? "OF",
     isPitcher: false,
     bats,
     throws: "R",
@@ -37,6 +41,7 @@ function bat(
     control: 50,
     durability: 50,
     speed: rates.speed ?? 50,
+    defense: rates.defense ?? 50,
     ...rates,
   };
 }
@@ -67,14 +72,29 @@ function pit(
     control,
     durability,
     speed: 30,
+    defense: 40,
   };
 }
 
-function lineup(players: SimPlayer[]): LineupEntry[] {
+function lineup(
+  players: SimPlayer[],
+  positions?: string[],
+): LineupEntry[] {
+  const defs = positions ?? [
+    "C",
+    "1B",
+    "2B",
+    "3B",
+    "SS",
+    "LF",
+    "CF",
+    "RF",
+    "DH",
+  ];
   return players.map((player, i) => ({
     player,
     battingOrder: i + 1,
-    position: "DH",
+    position: defs[i] ?? "DH",
   }));
 }
 
@@ -503,11 +523,138 @@ console.log(
   `Rickey score% when on — Ks behind: ${(kSeq.scoreRate * 100).toFixed(1)}% | contact: ${(cSeq.scoreRate * 100).toFixed(1)}%`,
 );
 
+// --- Park climate ---
+const climateBat = () =>
+  bat("cb", "Climate Bat", "R", {
+    kRate: 150,
+    bbRate: 90,
+    singleRate: 150,
+    doubleRate: 40,
+    tripleRate: 5,
+    hrRate: 35,
+    speed: 55,
+    defense: 50,
+  });
+const climateNine = () =>
+  lineup(Array.from({ length: 9 }, (_, i) => ({ ...climateBat(), id: `cb${i}` })));
+const climateStaff = (): StaffArm[] => [
+  { player: pit("csp", "Climate SP", "R", 70, 70, 80), role: "SP" },
+  { player: pit("ccl", "Climate CL", "R", 75, 75, 55), role: "CL" },
+];
+
+function totalRpg(n: number, parkCode: string) {
+  let runs = 0;
+  for (let i = 0; i < n; i++) {
+    const g = simulateGame({
+      awayLineup: climateNine(),
+      homeLineup: climateNine(),
+      awayStaff: climateStaff(),
+      homeStaff: climateStaff(),
+      park: PARK_BY_CODE[parkCode],
+      seed: 12000 + i * 19,
+    });
+    runs += g.homeScore + g.awayScore;
+  }
+  return runs / n;
+}
+
+const coorsRpg = totalRpg(60, "COL");
+const petroRpg = totalRpg(60, "SD");
+console.log(
+  `Park total RPG — COL: ${coorsRpg.toFixed(2)} | SD: ${petroRpg.toFixed(2)}`,
+);
+
+// --- Defense / BABIP ---
+function gloveNine(defense: number, prefix: string): LineupEntry[] {
+  const pos = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
+  return lineup(
+    pos.map((p, i) =>
+      bat(`${prefix}${i}`, `${prefix}-${p}`, "R", {
+        kRate: 140,
+        bbRate: 80,
+        singleRate: 145,
+        doubleRate: 35,
+        tripleRate: 4,
+        hrRate: 28,
+        speed: 50,
+        defense: p === "DH" ? 28 : defense,
+        primaryPos: p,
+      }),
+    ),
+    pos,
+  );
+}
+
+function awayRpgVsGloves(n: number, homeDefense: number) {
+  let runs = 0;
+  for (let i = 0; i < n; i++) {
+    const g = simulateGame({
+      awayLineup: gloveNine(50, "off"),
+      homeLineup: gloveNine(homeDefense, "glv"),
+      awayStaff: climateStaff(),
+      homeStaff: climateStaff(),
+      seed: 14000 + i * 23,
+    });
+    runs += g.awayScore;
+  }
+  return runs / n;
+}
+
+const vsEliteGlove = awayRpgVsGloves(70, 82);
+const vsBrickGlove = awayRpgVsGloves(70, 30);
+console.log(
+  `Away RPG vs gloves — elite ${vsEliteGlove.toFixed(2)} | brick ${vsBrickGlove.toFixed(2)}`,
+);
+
+// --- Baserunning extras ---
+function advanceEventsPerGame(n: number, speed: number) {
+  let events = 0;
+  const pos = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
+  const bats = lineup(
+    pos.map((p, i) =>
+      bat(`sp${speed}${i}`, `Speed${speed}-${i}`, "R", {
+        kRate: 110,
+        bbRate: 85,
+        singleRate: 175,
+        doubleRate: 48,
+        tripleRate: speed > 70 ? 12 : 3,
+        hrRate: 18,
+        speed,
+        defense: 50,
+        primaryPos: p,
+      }),
+    ),
+    pos,
+  );
+  for (let i = 0; i < n; i++) {
+    const g = simulateGame({
+      awayLineup: bats,
+      homeLineup: bats,
+      awayStaff: climateStaff(),
+      homeStaff: climateStaff(),
+      seed: 16000 + i * 29,
+    });
+    events += g.playByPlay.filter((p) =>
+      /first to third|scores from first|scores from second/.test(p.text),
+    ).length;
+  }
+  return events / n;
+}
+
+const fastAdv = advanceEventsPerGame(50, 88);
+const slowAdv = advanceEventsPerGame(50, 32);
+console.log(
+  `Advance notes/game — fast ${fastAdv.toFixed(2)} | slow ${slowAdv.toFixed(2)}`,
+);
+
 const checks = {
   platoon: vsUnit.rpg < vsSoft.rpg * 0.85,
   bullpenRa: eliteA.ra < junkA.ra,
   bullpenLate: eliteA.lateRa < junkA.lateRa,
   rickeyScoreRate: cSeq.scoreRate > kSeq.scoreRate + 0.05,
+  park: coorsRpg > petroRpg * 1.12,
+  defense: vsEliteGlove < vsBrickGlove,
+  baserunning: fastAdv > slowAdv + 0.15,
 };
 const ok = Object.values(checks).every(Boolean);
 
