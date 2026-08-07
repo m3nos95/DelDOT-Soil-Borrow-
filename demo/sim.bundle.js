@@ -230,8 +230,11 @@ var HardballSim = (() => {
     return clamp(28 + p.tripleRate * 3.2 - p.hrRate * 0.15, 20, 96);
   }
   function deriveDefense(p) {
-    var _a;
-    if (p.isPitcher) return 40;
+    var _a, _b;
+    const gg = Math.max(0, (_a = p.goldGloves) != null ? _a : 0);
+    if (p.isPitcher) {
+      return clamp(40 + Math.min(18, gg * 1.1), 35, 70);
+    }
     const base = {
       C: 56,
       SS: 64,
@@ -246,11 +249,18 @@ var HardballSim = (() => {
       UTIL: 50,
       P: 40
     };
-    let d = (_a = base[p.primaryPos]) != null ? _a : 50;
+    let d = (_b = base[p.primaryPos]) != null ? _b : 50;
     if (p.careerWAR != null) {
-      d += clamp((p.careerWAR - 25) * 0.12, -8, 10);
+      d += clamp((p.careerWAR - 25) * 0.1, -6, 8);
     }
-    return clamp(d, 20, 90);
+    let ggBonus = 0;
+    for (let i = 1; i <= gg; i++) {
+      if (i <= 5) ggBonus += 2.4;
+      else if (i <= 10) ggBonus += 1.6;
+      else ggBonus += 1;
+    }
+    d += Math.min(30, ggBonus);
+    return clamp(d, 20, 96);
   }
   function lineupDefense(lineup) {
     const fielders = lineup.filter((e) => e.position !== "DH");
