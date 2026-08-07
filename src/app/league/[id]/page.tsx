@@ -5,6 +5,7 @@ import { LeagueNav } from "@/components/LeagueNav";
 import { CommissionerStart, SimDayButton } from "@/components/SeasonControls";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { dynastyEraById } from "@/lib/environment";
 import { formatRecord, formatSalary, runDifferential } from "@/lib/format";
 
 export default async function LeaguePage({
@@ -62,6 +63,10 @@ export default async function LeaguePage({
               <span className="inline-flex items-center rounded-sm border border-[var(--line)] bg-black/30 px-2 py-0.5 font-mono text-[var(--foul)]">
                 {league.inviteCode}
               </span>{" "}
+              · {dynastyEraById(league.era).label}
+              {league.era !== "open"
+                ? ` (${dynastyEraById(league.era).yearFrom}–${dynastyEraById(league.era).yearTo})`
+                : ""}{" "}
               · {league.teams.length}/{league.maxTeams} teams ·{" "}
               {formatSalary(league.salaryCap)} cap
             </p>

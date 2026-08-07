@@ -1,17 +1,21 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   createLeagueAction,
   joinLeagueAction,
   type ActionState,
 } from "@/app/actions/league";
 import { FranchisePicker } from "@/components/FranchisePicker";
+import { DYNASTY_ERAS } from "@/lib/environment";
 
 const initial: ActionState = {};
 
 export function CreateLeagueForm() {
   const [state, action, pending] = useActionState(createLeagueAction, initial);
+  const [eraId, setEraId] = useState("modern");
+  const era = DYNASTY_ERAS.find((e) => e.id === eraId) ?? DYNASTY_ERAS[3];
+
   return (
     <form action={action} className="space-y-4">
       <div>
@@ -25,6 +29,33 @@ export function CreateLeagueForm() {
           required
           placeholder="Thursday Night Hardball"
         />
+      </div>
+
+      <div>
+        <label className="field-label" htmlFor="era">
+          Dynasty era
+        </label>
+        <select
+          id="era"
+          name="era"
+          className="field-input"
+          value={eraId}
+          onChange={(e) => setEraId(e.target.value)}
+          required
+        >
+          {DYNASTY_ERAS.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.label}
+              {e.id === "open" ? " — chaos" : ` (${e.yearFrom}–${e.yearTo})`}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-sm text-[var(--fog)]">{era.blurb}</p>
+        <p className="mt-1 text-xs text-[var(--fog)]">
+          Draft pool is locked to this window so rates stay apples-to-apples.
+          Locked at creation — can&apos;t mix Greene and Ruth unless you pick
+          All-time.
+        </p>
       </div>
 
       <FranchisePicker />

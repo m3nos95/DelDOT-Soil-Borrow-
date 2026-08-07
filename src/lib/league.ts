@@ -1,6 +1,10 @@
 import { customAlphabet } from "nanoid";
 import { prisma } from "./db";
-import { parkForCode } from "./environment";
+import {
+  dynastyEraById,
+  eraById,
+  parkForCode,
+} from "./environment";
 import type { Hand, SimPlayer, LineupEntry, StaffArm, BullpenRole } from "./sim";
 import { deriveDefense, deriveSpeed, simulateGame } from "./sim";
 
@@ -288,13 +292,18 @@ async function loadTeamSimParts(teamId: string, dayNumber: number) {
 export async function simulateScheduledGame(gameId: string) {
   const game = await prisma.game.findUnique({
     where: { id: gameId },
-    include: { homeTeam: true, awayTeam: true },
+    include: {
+      homeTeam: true,
+      awayTeam: true,
+      league: true,
+    },
   });
   if (!game) throw new Error("Game not found");
   if (game.status === "final") return game;
 
   const home = await loadTeamSimParts(game.homeTeamId, game.dayNumber);
   const away = await loadTeamSimParts(game.awayTeamId, game.dayNumber);
+  const dynasty = dynastyEraById(game.league.era);
 
   const result = simulateGame({
     homeLineup: home.lineupEntries,
@@ -302,6 +311,8 @@ export async function simulateScheduledGame(gameId: string) {
     homeStaff: home.staff,
     awayStaff: away.staff,
     park: parkForCode(game.homeTeam.abbreviation),
+    // Era-locked pools already carry native rates — keep climate neutral
+    era: eraById(dynasty.climateId),
     seed:
       game.dayNumber * 10007 +
       game.homeTeamId.charCodeAt(0) * 97 +

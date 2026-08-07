@@ -16,11 +16,18 @@ import {
 } from "./environment";
 
 export {
+  DYNASTY_ERAS,
+  DYNASTY_ERA_BY_ID,
   ERAS,
   NEUTRAL_PARK,
   PARK_BY_CODE,
+  dynastyEraById,
+  dynastyEraPlayerWhere,
   eraById,
+  eraOverlapYears,
   parkForCode,
+  playerInDynastyEra,
+  type DynastyEra,
   type EraEnv,
   type ParkFactors,
 } from "./environment";

@@ -5,6 +5,10 @@ import { DraftBoard } from "@/components/DraftBoard";
 import { LeagueNav } from "@/components/LeagueNav";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import {
+  dynastyEraById,
+  dynastyEraPlayerWhere,
+} from "@/lib/environment";
 
 const PAGE_SIZE = 75;
 
@@ -60,7 +64,9 @@ export default async function DraftPage({
   }
   const myRosterSet = new Set(myTeam.roster.map((r) => r.playerId));
   const payroll = myTeam.roster.reduce((s, r) => s + r.player.salary, 0);
-  const poolCount = await prisma.player.count();
+  const era = dynastyEraById(league.era);
+  const eraWhere = dynastyEraPlayerWhere(era);
+  const poolCount = await prisma.player.count({ where: eraWhere });
 
   let players: {
     id: string;
@@ -84,6 +90,7 @@ export default async function DraftPage({
   } else {
     const where = {
       isPitcher: tab === "pitchers",
+      ...eraWhere,
       ...(q
         ? {
             OR: [
@@ -113,9 +120,12 @@ export default async function DraftPage({
           Draft board
         </h1>
         <p className="mb-6 text-[var(--fog)]">
-          One career card per player — {poolCount.toLocaleString()} from
-          FanGraphs history (1871–2025). No Babe Ruth 1927 vs 1930. Search the
-          whole pool.
+          Era lock: <span className="text-[var(--foul)]">{era.label}</span>
+          {era.id !== "open"
+            ? ` (${era.yearFrom}–${era.yearTo})`
+            : ""}{" "}
+          · {poolCount.toLocaleString()} eligible career cards · one card per
+          player, no season splits.
         </p>
         <LeagueNav leagueId={id} status={league.status} />
         <DraftBoard

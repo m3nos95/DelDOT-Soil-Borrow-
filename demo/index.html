@@ -580,6 +580,11 @@
     </p>
 
     <div class="panel">
+      <div style="margin-bottom: 1rem;">
+        <label for="era">Dynasty era</label>
+        <select id="era"></select>
+        <p class="note" id="eraBlurb" style="margin-top: 0.5rem;"></p>
+      </div>
       <div class="row two">
         <div>
           <label for="away">Away</label>
@@ -780,6 +785,7 @@
     function fillSelects() {
       const away = document.getElementById("away");
       const home = document.getElementById("home");
+      const eraSel = document.getElementById("era");
       FRANCHISES.forEach((f) => {
         const o1 = document.createElement("option");
         o1.value = f.code;
@@ -792,6 +798,41 @@
       });
       away.value = "BOS";
       home.value = "NYAL";
+
+      (HardballSim.DYNASTY_ERAS || []).forEach((e) => {
+        const o = document.createElement("option");
+        o.value = e.id;
+        o.textContent =
+          e.id === "open"
+            ? e.label
+            : e.label + " (" + e.yearFrom + "–" + e.yearTo + ")";
+        eraSel.appendChild(o);
+      });
+      eraSel.value = "modern";
+      eraSel.addEventListener("change", syncEraBlurb);
+      syncEraBlurb();
+    }
+
+    function syncEraBlurb() {
+      const era = HardballSim.dynastyEraById(
+        document.getElementById("era").value,
+      );
+      const pool = eraPool(era);
+      const bats = pool.filter((p) => !p.isPitcher).length;
+      const arms = pool.filter((p) => p.isPitcher).length;
+      document.getElementById("eraBlurb").textContent =
+        era.blurb +
+        " · Demo stars in window: " +
+        bats +
+        " bats / " +
+        arms +
+        " arms (full app has the whole era pool).";
+    }
+
+    function eraPool(era) {
+      return (DEMO_PLAYERS || []).filter((p) =>
+        HardballSim.playerInDynastyEra(p.yearFrom, p.yearTo, era),
+      );
     }
 
     function toSimPlayer(raw) {
@@ -830,11 +871,17 @@
       return false;
     }
 
-    /** Split the star pool into two clubs with a seeded shuffle so matchups differ. */
-    function dealClubs(seed) {
+    /** Split the era-filtered star pool into two clubs with a seeded shuffle. */
+    function dealClubs(seed, era) {
       const rand = mulberry32(seed);
-      const bats = DEMO_PLAYERS.filter((p) => !p.isPitcher).slice();
-      const arms = DEMO_PLAYERS.filter((p) => p.isPitcher).slice();
+      const pool = eraPool(era);
+      const bats = pool.filter((p) => !p.isPitcher).slice();
+      const arms = pool.filter((p) => p.isPitcher).slice();
+      if (bats.length < 18 || arms.length < 12) {
+        throw new Error(
+          "Not enough demo stars in this era — pick All-time or another window (star subset is thin in some eras).",
+        );
+      }
       // Fisher–Yates
       for (const arr of [bats, arms]) {
         for (let i = arr.length - 1; i > 0; i--) {
@@ -1293,10 +1340,20 @@
 
       const awayF = franchiseByCode(awayCode);
       const homeF = franchiseByCode(homeCode);
-      const seed = (Date.now() ^ hashSeed(awayCode + homeCode)) >>> 0;
-      const dealt = dealClubs(
-        hashSeed(awayCode + "|" + homeCode + "|" + (seed % 97)),
+      const era = HardballSim.dynastyEraById(
+        document.getElementById("era").value,
       );
+      const seed = (Date.now() ^ hashSeed(awayCode + homeCode)) >>> 0;
+      let dealt;
+      try {
+        dealt = dealClubs(
+          hashSeed(awayCode + "|" + homeCode + "|" + era.id + "|" + (seed % 97)),
+          era,
+        );
+      } catch (err) {
+        alert(err.message || String(err));
+        return;
+      }
       showRosters(dealt.away, dealt.home, awayF, homeF);
 
       const away = clubToSim(dealt.away);
@@ -1308,6 +1365,7 @@
         awayStaff: away.staff,
         homeStaff: home.staff,
         park: HardballSim.parkForCode(homeCode),
+        era: HardballSim.eraById(era.climateId),
         seed,
       });
 

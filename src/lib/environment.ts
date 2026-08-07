@@ -128,3 +128,108 @@ export function eraById(id?: string | null): EraEnv {
   if (!id) return ERAS.neutral;
   return ERAS[id] ?? ERAS.neutral;
 }
+
+/**
+ * Dynasty era locks — pick at league creation.
+ * Filters the draft pool so Hunter Greene isn't whiffing Babe Ruth
+ * unless you explicitly choose All-time chaos.
+ */
+export type DynastyEra = {
+  id: string;
+  label: string;
+  blurb: string;
+  yearFrom: number;
+  yearTo: number;
+  /** Minimum overlapping seasons to be draftable */
+  minOverlap: number;
+  /** Sim climate id — usually neutral once the pool is era-native */
+  climateId: string;
+};
+
+export const DYNASTY_ERAS: DynastyEra[] = [
+  {
+    id: "pre1950",
+    label: "Pre-1950",
+    blurb: "Dead ball through WWII — Ruth, Gehrig, Hornsby, Grove",
+    yearFrom: 1871,
+    yearTo: 1949,
+    minOverlap: 3,
+    climateId: "neutral",
+  },
+  {
+    id: "classic",
+    label: "1950–1979",
+    blurb: "Integration through the 70s — Mays, Aaron, Koufax, Seaver",
+    yearFrom: 1950,
+    yearTo: 1979,
+    minOverlap: 3,
+    climateId: "neutral",
+  },
+  {
+    id: "freeagent",
+    label: "1980–1999",
+    blurb: "Free agency & power boom — Rickey, Bonds peak start, Maddux",
+    yearFrom: 1980,
+    yearTo: 1999,
+    minOverlap: 3,
+    climateId: "neutral",
+  },
+  {
+    id: "modern",
+    label: "2000–now",
+    blurb: "Moneyball through the K era — Pujols, Trout, Verlander, Greene",
+    yearFrom: 2000,
+    yearTo: 2025,
+    minOverlap: 3,
+    climateId: "neutral",
+  },
+  {
+    id: "open",
+    label: "All-time (chaos)",
+    blurb: "Every career card. Yes, Greene can K Ruth. You asked for it.",
+    yearFrom: 1871,
+    yearTo: 2025,
+    minOverlap: 1,
+    climateId: "neutral",
+  },
+];
+
+export const DYNASTY_ERA_BY_ID = Object.fromEntries(
+  DYNASTY_ERAS.map((e) => [e.id, e]),
+) as Record<string, DynastyEra>;
+
+export function dynastyEraById(id?: string | null): DynastyEra {
+  if (!id) return DYNASTY_ERA_BY_ID.modern;
+  return DYNASTY_ERA_BY_ID[id] ?? DYNASTY_ERA_BY_ID.modern;
+}
+
+/** Seasons of career overlapping the dynasty window. */
+export function eraOverlapYears(
+  yearFrom: number,
+  yearTo: number,
+  era: Pick<DynastyEra, "yearFrom" | "yearTo">,
+): number {
+  const start = Math.max(yearFrom, era.yearFrom);
+  const end = Math.min(yearTo, era.yearTo);
+  return Math.max(0, end - start + 1);
+}
+
+export function playerInDynastyEra(
+  yearFrom: number,
+  yearTo: number,
+  era: DynastyEra,
+): boolean {
+  return eraOverlapYears(yearFrom, yearTo, era) >= era.minOverlap;
+}
+
+/**
+ * Prisma where clause approximating min overlap without raw SQL:
+ * yearFrom <= eraTo-(min-1) AND yearTo >= eraFrom+(min-1)
+ */
+export function dynastyEraPlayerWhere(era: DynastyEra) {
+  const pad = Math.max(0, era.minOverlap - 1);
+  return {
+    yearFrom: { lte: era.yearTo - pad },
+    yearTo: { gte: era.yearFrom + pad },
+  };
+}

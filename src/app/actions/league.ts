@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import {
+  dynastyEraById,
+  playerInDynastyEra,
+} from "@/lib/environment";
 import { getFranchise } from "@/lib/franchises";
 import {
   draftedPlayerIds,
@@ -37,6 +41,11 @@ export async function createLeagueAction(
   const name = String(formData.get("name") ?? "").trim();
   const maxTeams = Number(formData.get("maxTeams") ?? 6);
   const gamesPerTeam = Number(formData.get("gamesPerTeam") ?? 20);
+  const eraId = String(formData.get("era") ?? "modern").trim();
+  if (!["pre1950", "classic", "freeagent", "modern", "open"].includes(eraId)) {
+    return { error: "Pick a dynasty era" };
+  }
+  const era = dynastyEraById(eraId);
   const picked = resolveFranchise(formData);
   if ("error" in picked) return { error: picked.error };
   const { franchise } = picked;
@@ -57,6 +66,7 @@ export async function createLeagueAction(
       inviteCode,
       maxTeams,
       gamesPerTeam,
+      era: era.id,
       salaryCap: 120_000_000,
       commissionerId: user.id,
       status: "drafting",
@@ -138,6 +148,13 @@ export async function draftPlayerAction(
 
   const player = await prisma.player.findUnique({ where: { id: playerId } });
   if (!player) return { error: "Player not found" };
+
+  const era = dynastyEraById(team.league.era);
+  if (!playerInDynastyEra(player.yearFrom, player.yearTo, era)) {
+    return {
+      error: `${player.name} is outside this league’s era (${era.label})`,
+    };
+  }
 
   const payroll = team.roster.reduce((s, r) => s + r.player.salary, 0);
   if (payroll + player.salary > team.league.salaryCap) {

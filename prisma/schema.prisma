@@ -58,6 +58,8 @@ model League {
   salaryCap       Int      @default(120000000)
   maxTeams        Int      @default(6)
   gamesPerTeam    Int      @default(20)
+  /// Dynasty era lock: pre1950 | classic | freeagent | modern | open
+  era             String   @default("modern")
   status          String   @default("forming") // forming | drafting | season | complete
   commissionerId  String
   commissioner    User     @relation("LeagueCommissioner", fields: [commissionerId], references: [id])

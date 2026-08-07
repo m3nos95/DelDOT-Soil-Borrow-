@@ -52,10 +52,12 @@ npm run db:reseed   # clears leagues and reloads the player table
 ## How to play with friends
 
 1. Create accounts
-2. One person creates a league and shares the invite code
-3. Everyone drafts under the $120M salary cap
+2. One person creates a league, picks a **dynasty era**, and shares the invite code
+3. Draft only that era’s career cards (Pre-1950 / 1950–79 / 1980–99 / 2000–now, or All-time chaos)
 4. Lock rosters → commissioner starts the season
 5. Hit **Sim next day**, check box scores, argue in the group chat
+
+Era locks keep rates apples-to-apples — Hunter Greene doesn’t get a free K party against Babe Ruth unless you choose All-time.
 
 ## Stack
 

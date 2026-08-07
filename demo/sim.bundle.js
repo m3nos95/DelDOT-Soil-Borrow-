@@ -21,17 +21,23 @@ var HardballSim = (() => {
   // src/lib/sim.ts
   var sim_exports = {};
   __export(sim_exports, {
+    DYNASTY_ERAS: () => DYNASTY_ERAS,
+    DYNASTY_ERA_BY_ID: () => DYNASTY_ERA_BY_ID,
     ERAS: () => ERAS,
     NEUTRAL_PARK: () => NEUTRAL_PARK,
     PARK_BY_CODE: () => PARK_BY_CODE,
     batterHandVs: () => batterHandVs,
     deriveDefense: () => deriveDefense,
     deriveSpeed: () => deriveSpeed,
+    dynastyEraById: () => dynastyEraById,
+    dynastyEraPlayerWhere: () => dynastyEraPlayerWhere,
     eraById: () => eraById,
+    eraOverlapYears: () => eraOverlapYears,
     formatIp: () => formatIp,
     lineupDefense: () => lineupDefense,
     parkForCode: () => parkForCode,
     platoonOffenseFactor: () => platoonOffenseFactor,
+    playerInDynastyEra: () => playerInDynastyEra,
     simulateGame: () => simulateGame
   });
 
@@ -134,6 +140,76 @@ var HardballSim = (() => {
     var _a;
     if (!id) return ERAS.neutral;
     return (_a = ERAS[id]) != null ? _a : ERAS.neutral;
+  }
+  var DYNASTY_ERAS = [
+    {
+      id: "pre1950",
+      label: "Pre-1950",
+      blurb: "Dead ball through WWII \u2014 Ruth, Gehrig, Hornsby, Grove",
+      yearFrom: 1871,
+      yearTo: 1949,
+      minOverlap: 3,
+      climateId: "neutral"
+    },
+    {
+      id: "classic",
+      label: "1950\u20131979",
+      blurb: "Integration through the 70s \u2014 Mays, Aaron, Koufax, Seaver",
+      yearFrom: 1950,
+      yearTo: 1979,
+      minOverlap: 3,
+      climateId: "neutral"
+    },
+    {
+      id: "freeagent",
+      label: "1980\u20131999",
+      blurb: "Free agency & power boom \u2014 Rickey, Bonds peak start, Maddux",
+      yearFrom: 1980,
+      yearTo: 1999,
+      minOverlap: 3,
+      climateId: "neutral"
+    },
+    {
+      id: "modern",
+      label: "2000\u2013now",
+      blurb: "Moneyball through the K era \u2014 Pujols, Trout, Verlander, Greene",
+      yearFrom: 2e3,
+      yearTo: 2025,
+      minOverlap: 3,
+      climateId: "neutral"
+    },
+    {
+      id: "open",
+      label: "All-time (chaos)",
+      blurb: "Every career card. Yes, Greene can K Ruth. You asked for it.",
+      yearFrom: 1871,
+      yearTo: 2025,
+      minOverlap: 1,
+      climateId: "neutral"
+    }
+  ];
+  var DYNASTY_ERA_BY_ID = Object.fromEntries(
+    DYNASTY_ERAS.map((e) => [e.id, e])
+  );
+  function dynastyEraById(id) {
+    var _a;
+    if (!id) return DYNASTY_ERA_BY_ID.modern;
+    return (_a = DYNASTY_ERA_BY_ID[id]) != null ? _a : DYNASTY_ERA_BY_ID.modern;
+  }
+  function eraOverlapYears(yearFrom, yearTo, era) {
+    const start = Math.max(yearFrom, era.yearFrom);
+    const end = Math.min(yearTo, era.yearTo);
+    return Math.max(0, end - start + 1);
+  }
+  function playerInDynastyEra(yearFrom, yearTo, era) {
+    return eraOverlapYears(yearFrom, yearTo, era) >= era.minOverlap;
+  }
+  function dynastyEraPlayerWhere(era) {
+    const pad = Math.max(0, era.minOverlap - 1);
+    return {
+      yearFrom: { lte: era.yearTo - pad },
+      yearTo: { gte: era.yearFrom + pad }
+    };
   }
 
   // src/lib/sim.ts
