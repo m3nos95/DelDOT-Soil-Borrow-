@@ -1362,13 +1362,14 @@
         : "";
 
       const playEl = document.getElementById("castPlay");
+      const castRoot = document.getElementById("cast");
       playEl.classList.remove("flash", "big");
       void playEl.offsetWidth;
       playEl.textContent = play.text.replace(/^=== | ===$/g, "").replace(/^=== /, "");
       playEl.classList.add("flash");
-      if (isBigPlay(play.text) || play.text.startsWith("===")) {
-        playEl.classList.add("big");
-      }
+      const big = isBigPlay(play.text) || play.text.startsWith("===");
+      playEl.classList.toggle("big", big);
+      castRoot.classList.toggle("gc-big", big);
       flashBall(play.text);
 
       const feed = document.getElementById("castFeed");
