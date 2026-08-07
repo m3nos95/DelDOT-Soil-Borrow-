@@ -6,7 +6,7 @@
   <title>HARDBALL — local sim demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Pixelify+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg0: #0a1210;
@@ -15,6 +15,15 @@
       --amber: #e8a838;
       --muted: #8a9a92;
       --line: rgba(232, 228, 217, 0.12);
+      --pix: "Pixelify Sans", "IBM Plex Mono", monospace;
+      --bit-grass-a: #1f6b3a;
+      --bit-grass-b: #175530;
+      --bit-dirt: #c49a4a;
+      --bit-dirt-dk: #8a6a2e;
+      --bit-wall: #3a2a18;
+      --bit-sky: #142038;
+      --bit-ui: #101820;
+      --bit-edge: #f0d060;
     }
 
     * { box-sizing: border-box; }
@@ -250,183 +259,288 @@
     .pbp .inning:first-child { margin-top: 0; }
     .pbp .score { color: rgba(232, 228, 217, 0.35); margin-right: 0.5rem; }
 
-    /* —— Gamecast —— */
+    /* —— Retro Gamecast (16 / 64-bit) —— */
     .cast {
       display: none;
       margin-top: 2rem;
-      border-top: 1px solid var(--line);
-      padding-top: 1.5rem;
       animation: rise 0.5s ease-out both;
     }
     .cast.show { display: block; }
 
-    .cast-top {
+    .cart {
+      position: relative;
+      background: var(--bit-ui);
+      border: 4px solid var(--bit-edge);
+      box-shadow:
+        0 0 0 3px #5a4010,
+        0 12px 0 #0a0c10,
+        0 0 40px rgba(240, 208, 96, 0.12);
+      padding: 0.75rem;
+      image-rendering: pixelated;
+    }
+    .cart::before {
+      content: "";
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.03) 0 1px,
+        transparent 1px 3px
+      );
+      mix-blend-mode: soft-light;
+    }
+    .cast.bit64 .cart {
+      border-width: 2px;
+      border-radius: 10px;
+      box-shadow:
+        0 0 0 1px rgba(240, 208, 96, 0.35),
+        0 18px 40px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      image-rendering: auto;
+    }
+    .cast.bit64 .cart::before { opacity: 0.35; }
+
+    .bit-toggle {
+      display: flex;
+      gap: 0.4rem;
+      justify-content: flex-end;
+      margin-bottom: 0.55rem;
+    }
+    .bit-toggle button {
+      font-family: var(--pix);
+      font-size: 0.65rem;
+      letter-spacing: 0.06em;
+      padding: 0.45rem 0.65rem;
+      background: #0c1218;
+      color: #8a9a92;
+      border: 2px solid #3a4540;
+    }
+    .bit-toggle button.on {
+      color: #1a1205;
+      background: var(--bit-edge);
+      border-color: #fff3b0;
+    }
+
+    .hud {
       display: grid;
-      gap: 0.75rem;
-      margin-bottom: 1rem;
+      gap: 0.55rem;
+      margin-bottom: 0.65rem;
+      background: #080e14;
+      border: 3px solid #4a3a18;
+      padding: 0.55rem 0.65rem;
     }
     @media (min-width: 640px) {
-      .cast-top {
-        grid-template-columns: 1fr auto 1fr;
-        align-items: end;
-      }
+      .hud { grid-template-columns: 1fr auto 1fr; align-items: center; }
     }
+    .cast.bit64 .hud {
+      border-width: 1px;
+      border-radius: 8px;
+      border-color: rgba(240, 208, 96, 0.35);
+      background: linear-gradient(180deg, #152030, #0a121c);
+    }
+
     .cast-team {
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.75rem;
-      letter-spacing: 0.08em;
+      font-family: var(--pix);
+      font-size: 0.62rem;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: var(--muted);
+      color: #9ab0a4;
     }
     .cast-team strong {
       display: block;
-      font-family: "Bebas Neue", sans-serif;
-      font-size: clamp(2.2rem, 7vw, 3.2rem);
-      letter-spacing: 0.04em;
-      color: var(--chalk);
+      font-family: var(--pix);
+      font-size: clamp(1.8rem, 6vw, 2.6rem);
+      color: #fff6c8;
       line-height: 1;
-      font-weight: 400;
+      font-weight: 700;
+      text-shadow: 2px 2px 0 #5a4010;
+    }
+    .cast.bit64 .cast-team strong {
+      text-shadow: 0 2px 8px rgba(240, 208, 96, 0.35);
+      font-family: "Bebas Neue", sans-serif;
+      letter-spacing: 0.04em;
     }
     .cast-team.home { text-align: right; }
     .cast-mid {
       text-align: center;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.72rem;
-      color: var(--amber);
-      letter-spacing: 0.14em;
+      font-family: var(--pix);
+      font-size: 0.7rem;
+      color: var(--bit-edge);
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      padding-bottom: 0.35rem;
     }
     .cast-mid .outs {
       display: flex;
       justify-content: center;
-      gap: 0.35rem;
-      margin-top: 0.45rem;
+      gap: 0.3rem;
+      margin-top: 0.4rem;
     }
     .cast-mid .outs span {
-      width: 0.55rem;
-      height: 0.55rem;
-      border-radius: 50%;
-      border: 1px solid var(--amber);
+      width: 0.7rem;
+      height: 0.7rem;
+      border: 2px solid var(--bit-edge);
       background: transparent;
+      image-rendering: pixelated;
+      box-shadow: 1px 1px 0 #000;
     }
-    .cast-mid .outs span.on { background: var(--amber); }
+    .cast.bit64 .cast-mid .outs span { border-radius: 50%; box-shadow: none; }
+    .cast-mid .outs span.on {
+      background: var(--bit-edge);
+      box-shadow: 0 0 8px rgba(240, 208, 96, 0.55);
+    }
 
     .field-wrap {
       position: relative;
-      max-width: 420px;
-      margin: 0 auto 1rem;
+      max-width: 440px;
+      margin: 0 auto 0.75rem;
       aspect-ratio: 1;
+      border: 3px solid #2a2010;
+      background: var(--bit-sky);
+      overflow: hidden;
+    }
+    .cast.bit64 .field-wrap {
+      border-radius: 8px;
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
     }
     .field {
       width: 100%;
       height: 100%;
       display: block;
-      border: 1px solid var(--line);
-      background:
-        radial-gradient(ellipse 55% 40% at 50% 58%, rgba(139, 90, 43, 0.35), transparent 70%),
-        radial-gradient(circle at 50% 55%, #1f4a38 0%, #163528 55%, #0f241c 100%);
+      shape-rendering: crispEdges;
     }
+    .cast.bit64 .field { shape-rendering: geometricPrecision; }
+
     .base {
-      fill: rgba(232, 228, 217, 0.18);
-      stroke: rgba(232, 228, 217, 0.35);
+      fill: #d8d0b8;
+      stroke: #6a6048;
       stroke-width: 2;
-      transition: fill 0.25s ease, transform 0.25s ease;
-      transform-box: fill-box;
-      transform-origin: center;
     }
     .base.on {
-      fill: var(--amber);
-      stroke: #f0b84a;
-      animation: basePop 0.35s ease;
+      fill: #ffe066;
+      stroke: #fff3b0;
+      filter: drop-shadow(0 0 4px rgba(255, 224, 102, 0.8));
     }
-    .home-plate {
-      fill: rgba(232, 228, 217, 0.55);
-      stroke: rgba(232, 228, 217, 0.7);
-      stroke-width: 1.5;
-    }
-    .mound {
-      fill: rgba(139, 90, 43, 0.55);
-    }
-    .pitcher-label {
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.68rem;
-      fill: var(--chalk);
-      text-anchor: middle;
-    }
-    .infield-dirt {
-      fill: rgba(139, 90, 43, 0.28);
-    }
-    .foul-line {
-      stroke: rgba(232, 228, 217, 0.35);
-      stroke-width: 1.5;
-      fill: none;
+    .runner { opacity: 0; transition: opacity 0.12s steps(2); }
+    .runner.on { opacity: 1; animation: spriteHop 0.35s steps(2); }
+    .home-plate { fill: #f2eee0; stroke: #8a8470; stroke-width: 2; }
+    .mound { fill: var(--bit-dirt-dk); stroke: var(--bit-dirt); stroke-width: 2; }
+    .wall { fill: var(--bit-wall); }
+    .wall-top { fill: #5a4020; }
+    .infield-dirt { fill: var(--bit-dirt); stroke: var(--bit-dirt-dk); stroke-width: 3; }
+    .foul-line { stroke: #f2eee0; stroke-width: 3; fill: none; stroke-linecap: square; }
+    .cast.bit64 .foul-line { stroke-width: 2; stroke-linecap: round; }
+    .cast.bit64 .infield-dirt {
+      fill: url(#dirt64);
+      stroke: rgba(180, 130, 60, 0.5);
     }
 
     .cast-play {
-      min-height: 3.2rem;
+      min-height: 3.4rem;
       text-align: center;
-      font-size: 1.15rem;
+      font-family: var(--pix);
+      font-size: 0.95rem;
       line-height: 1.35;
-      margin: 0.25rem 0 1rem;
-      transition: opacity 0.2s ease, transform 0.2s ease;
+      margin: 0.35rem 0 0.75rem;
+      color: #e8f0ea;
+      text-shadow: 2px 2px 0 #000;
     }
-    .cast-play.flash {
-      animation: playIn 0.35s ease;
+    .cast.bit64 .cast-play {
+      font-family: "Source Serif 4", Georgia, serif;
+      text-shadow: none;
+      font-size: 1.1rem;
     }
+    .cast-play.flash { animation: playIn 0.28s steps(3); }
+    .cast.bit64 .cast-play.flash { animation: playIn 0.35s ease; }
     .cast-play.big {
-      color: var(--amber);
-      font-size: 1.35rem;
+      color: #ffe066;
+      font-size: 1.1rem;
     }
     .cast-pitcher {
       text-align: center;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.68rem;
-      letter-spacing: 0.1em;
+      font-family: var(--pix);
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 0.75rem;
+      color: #8aa090;
+      margin-bottom: 0.35rem;
     }
 
     .cast-controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
+      gap: 0.45rem;
       justify-content: center;
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
     }
     .cast-controls button {
-      padding: 0.65rem 0.9rem;
-      font-size: 0.7rem;
+      font-family: var(--pix);
+      padding: 0.55rem 0.75rem;
+      font-size: 0.65rem;
+      border: 2px solid #4a3a18;
+      background: #1a2218;
+      color: #e8e4d9;
+    }
+    .cast-controls button:hover {
+      border-color: var(--bit-edge);
+      color: var(--bit-edge);
     }
     .speed {
       display: flex;
       align-items: center;
       gap: 0.4rem;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 0.68rem;
-      color: var(--muted);
-      letter-spacing: 0.08em;
+      font-family: var(--pix);
+      font-size: 0.62rem;
+      color: #8aa090;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
     }
     .speed input[type="range"] {
       width: 90px;
-      accent-color: var(--amber);
+      accent-color: var(--bit-edge);
     }
 
     .cast-feed {
-      max-height: 160px;
+      max-height: 150px;
       overflow: auto;
-      border: 1px solid var(--line);
-      background: rgba(0, 0, 0, 0.22);
-      padding: 0.6rem 0.85rem;
+      border: 3px solid #2a2010;
+      background: #060a0e;
+      padding: 0.55rem 0.7rem;
+      font-family: var(--pix);
+      font-size: 0.62rem;
+      line-height: 1.55;
+      color: #7a9084;
+    }
+    .cast.bit64 .cast-feed {
+      border-width: 1px;
+      border-radius: 6px;
       font-family: "IBM Plex Mono", monospace;
       font-size: 0.68rem;
-      line-height: 1.5;
-      color: #9aaca3;
     }
-    .cast-feed .row.current { color: var(--chalk); }
-    .cast-feed .row.marker { color: var(--amber); }
+    .cast-feed .row.current { color: #fff6c8; }
+    .cast-feed .row.marker { color: var(--bit-edge); }
+
+    .ball-flash {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      margin: -5px 0 0 -5px;
+      background: #fff;
+      border: 2px solid #f0d060;
+      opacity: 0;
+      z-index: 4;
+      pointer-events: none;
+      image-rendering: pixelated;
+    }
+    .cast.bit64 .ball-flash { border-radius: 50%; }
+    .ball-flash.go {
+      animation: ballFly 0.45s steps(4) forwards;
+    }
+    .cast.bit64 .ball-flash.go {
+      animation: ballFly 0.5s ease-out forwards;
+    }
 
     .details {
       display: none;
@@ -440,24 +554,29 @@
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    @keyframes basePop {
-      0% { transform: scale(0.7); }
-      60% { transform: scale(1.15); }
-      100% { transform: scale(1); }
+    @keyframes spriteHop {
+      0% { transform: translateY(3px); }
+      50% { transform: translateY(-3px); }
+      100% { transform: translateY(0); }
     }
     @keyframes playIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ballFly {
+      0% { opacity: 1; transform: translate(200px, 300px) scale(1); }
+      60% { opacity: 1; transform: translate(120px, 80px) scale(1.2); }
+      100% { opacity: 0; transform: translate(80px, 40px) scale(0.6); }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1 class="brand">HARDBALL</h1>
-    <p class="tag">Local HTML demo · no server</p>
+    <p class="tag">Local HTML demo · 16-bit / 64-bit Gamecast</p>
     <p class="lede">
-      Pick two city clubs, then watch the game unfold on a diamond — Gamecast-style, play by play.
-      Platoon, pen, park, gloves, and baserunning are live. Full draft leagues come with the Next.js app.
+      Pick two city clubs, then watch a retro diamond Gamecast. Toggle 16-bit (SNES chunky) or 64-bit (smoother HUD).
+      Platoon, pen, park, gloves, and baserunning are live.
     </p>
 
     <div class="panel">
@@ -482,51 +601,103 @@
       <div class="rosters" id="rosters"></div>
     </div>
 
-    <div class="cast" id="cast">
-      <div class="cast-top">
-        <div class="cast-team" id="castAway">
-          <span id="castAwayName">Away</span>
-          <strong id="castAwayRuns">0</strong>
-        </div>
-        <div class="cast-mid">
-          <div id="castInning">Top 1</div>
-          <div class="outs" id="castOuts" aria-label="Outs">
-            <span></span><span></span><span></span>
+    <div class="cast bit16" id="cast">
+      <div class="bit-toggle" role="group" aria-label="Graphics mode">
+        <button type="button" class="on" id="bit16Btn" data-mode="bit16">16-bit</button>
+        <button type="button" id="bit64Btn" data-mode="bit64">64-bit</button>
+      </div>
+      <div class="cart">
+        <div class="hud">
+          <div class="cast-team" id="castAway">
+            <span id="castAwayName">Away</span>
+            <strong id="castAwayRuns">0</strong>
+          </div>
+          <div class="cast-mid">
+            <div id="castInning">Top 1</div>
+            <div class="outs" id="castOuts" aria-label="Outs">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="cast-team home" id="castHome">
+            <span id="castHomeName">Home</span>
+            <strong id="castHomeRuns">0</strong>
           </div>
         </div>
-        <div class="cast-team home" id="castHome">
-          <span id="castHomeName">Home</span>
-          <strong id="castHomeRuns">0</strong>
+
+        <div class="field-wrap">
+          <div class="ball-flash" id="ballFlash"></div>
+          <svg class="field" viewBox="0 0 400 400" role="img" aria-label="Diamond">
+            <defs>
+              <pattern id="grass16" width="16" height="16" patternUnits="userSpaceOnUse">
+                <rect width="16" height="16" fill="#1f6b3a" />
+                <rect width="8" height="8" fill="#175530" />
+                <rect x="8" y="8" width="8" height="8" fill="#175530" />
+                <rect x="4" y="2" width="2" height="2" fill="#248044" />
+                <rect x="12" y="10" width="2" height="2" fill="#248044" />
+              </pattern>
+              <radialGradient id="dirt64" cx="50%" cy="50%" r="60%">
+                <stop offset="0%" stop-color="#d4a85a" />
+                <stop offset="100%" stop-color="#8a6a2e" />
+              </radialGradient>
+              <linearGradient id="sky64" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1a3a5c" />
+                <stop offset="100%" stop-color="#0e2438" />
+              </linearGradient>
+            </defs>
+            <!-- outfield grass -->
+            <polygon points="200,20 380,200 200,380 20,200" fill="url(#grass16)" />
+            <!-- warning track / wall -->
+            <polygon class="wall" points="200,8 392,200 200,392 8,200" fill="none" stroke="#3a2a18" stroke-width="14" />
+            <polygon class="wall-top" points="200,14 386,200 200,386 14,200" fill="none" stroke="#5a4020" stroke-width="4" />
+            <!-- foul territory corners -->
+            <polygon points="0,400 120,400 200,320 80,400" fill="#0e1c14" />
+            <polygon points="280,400 400,400 320,400 200,320" fill="#0e1c14" />
+            <line class="foul-line" x1="200" y1="328" x2="48" y2="100" />
+            <line class="foul-line" x1="200" y1="328" x2="352" y2="100" />
+            <polygon class="infield-dirt" points="200,108 292,200 200,292 108,200" />
+            <circle class="mound" cx="200" cy="200" r="16" />
+            <circle cx="200" cy="200" r="4" fill="#f2eee0" />
+            <!-- bases -->
+            <polygon class="base" id="base2" points="200,100 220,120 200,140 180,120" />
+            <polygon class="base" id="base3" points="100,200 120,180 140,200 120,220" />
+            <polygon class="base" id="base1" points="300,200 320,180 340,200 320,220" />
+            <polygon class="home-plate" points="200,332 218,314 218,300 182,300 182,314" />
+            <!-- pixel runners -->
+            <g id="runner2" class="runner" transform="translate(192,92)">
+              <rect x="4" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="2" y="6" width="12" height="10" fill="#c43c2a" />
+              <rect x="2" y="16" width="5" height="6" fill="#1a2040" />
+              <rect x="9" y="16" width="5" height="6" fill="#1a2040" />
+            </g>
+            <g id="runner3" class="runner" transform="translate(92,192)">
+              <rect x="4" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="2" y="6" width="12" height="10" fill="#2a6ac4" />
+              <rect x="2" y="16" width="5" height="6" fill="#1a2040" />
+              <rect x="9" y="16" width="5" height="6" fill="#1a2040" />
+            </g>
+            <g id="runner1" class="runner" transform="translate(292,192)">
+              <rect x="4" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="2" y="6" width="12" height="10" fill="#e8a838" />
+              <rect x="2" y="16" width="5" height="6" fill="#1a2040" />
+              <rect x="9" y="16" width="5" height="6" fill="#1a2040" />
+            </g>
+          </svg>
         </div>
-      </div>
 
-      <div class="field-wrap">
-        <svg class="field" viewBox="0 0 400 400" role="img" aria-label="Diamond">
-          <polygon class="infield-dirt" points="200,95 305,200 200,305 95,200" />
-          <line class="foul-line" x1="200" y1="320" x2="55" y2="120" />
-          <line class="foul-line" x1="200" y1="320" x2="345" y2="120" />
-          <circle class="mound" cx="200" cy="200" r="14" />
-          <polygon class="base" id="base2" points="200,108 218,126 200,144 182,126" />
-          <polygon class="base" id="base3" points="108,200 126,182 144,200 126,218" />
-          <polygon class="base" id="base1" points="292,200 310,182 328,200 310,218" />
-          <polygon class="home-plate" points="200,318 214,304 214,292 186,292 186,304" />
-          <text class="pitcher-label" id="castMoundName" x="200" y="188"></text>
-        </svg>
-      </div>
+        <div class="cast-pitcher" id="castPitcherMeta">On the mound</div>
+        <div class="cast-play" id="castPlay">Waiting for first pitch…</div>
 
-      <div class="cast-pitcher" id="castPitcherMeta">On the mound</div>
-      <div class="cast-play" id="castPlay">Waiting for first pitch…</div>
-
-      <div class="cast-controls">
-        <button type="button" class="ghost" id="castPause">Pause</button>
-        <button type="button" class="ghost" id="castStep">Step</button>
-        <button type="button" class="ghost" id="castSkip">Skip to final</button>
-        <label class="speed">
-          Speed
-          <input type="range" id="castSpeed" min="1" max="5" value="3" />
-        </label>
+        <div class="cast-controls">
+          <button type="button" id="castPause">Pause</button>
+          <button type="button" id="castStep">Step</button>
+          <button type="button" id="castSkip">Skip to final</button>
+          <label class="speed">
+            Speed
+            <input type="range" id="castSpeed" min="1" max="5" value="3" />
+          </label>
+        </div>
+        <div class="cast-feed" id="castFeed"></div>
       </div>
-      <div class="cast-feed" id="castFeed"></div>
     </div>
 
     <div class="details" id="board">
@@ -948,6 +1119,30 @@
       document.getElementById("base1").classList.toggle("on", !!b[0]);
       document.getElementById("base2").classList.toggle("on", !!b[1]);
       document.getElementById("base3").classList.toggle("on", !!b[2]);
+      document.getElementById("runner1").classList.toggle("on", !!b[0]);
+      document.getElementById("runner2").classList.toggle("on", !!b[1]);
+      document.getElementById("runner3").classList.toggle("on", !!b[2]);
+    }
+
+    function flashBall(text) {
+      if (!/singles|doubles|triples|homers|flies|lines|grounds/.test(text || "")) {
+        return;
+      }
+      const el = document.getElementById("ballFlash");
+      el.classList.remove("go");
+      void el.offsetWidth;
+      el.classList.add("go");
+    }
+
+    function setBitMode(mode) {
+      const castEl = document.getElementById("cast");
+      castEl.classList.remove("bit16", "bit64");
+      castEl.classList.add(mode);
+      document.getElementById("bit16Btn").classList.toggle("on", mode === "bit16");
+      document.getElementById("bit64Btn").classList.toggle("on", mode === "bit64");
+      try {
+        localStorage.setItem("hardball-bit", mode);
+      } catch (_) {}
     }
 
     function setOuts(n) {
@@ -963,7 +1158,6 @@
         halfLabel + " " + play.inning;
       setOuts(play.outs || 0);
       setBases(play.bases);
-      document.getElementById("castMoundName").textContent = "";
       document.getElementById("castPitcherMeta").textContent = play.pitcher
         ? "Pitching · " + play.pitcher
         : "";
@@ -976,6 +1170,7 @@
       if (isBigPlay(play.text) || play.text.startsWith("===")) {
         playEl.classList.add("big");
       }
+      flashBall(play.text);
 
       const feed = document.getElementById("castFeed");
       const rows = cast.plays.slice(0, cast.idx + 1).slice(-12);
@@ -1145,8 +1340,14 @@
       if (cast.plays.length) renderCastFrame(cast.plays[cast.idx]);
       finishCast();
     });
+    document.getElementById("bit16Btn").addEventListener("click", () => setBitMode("bit16"));
+    document.getElementById("bit64Btn").addEventListener("click", () => setBitMode("bit64"));
 
     fillSelects();
+    try {
+      const saved = localStorage.getItem("hardball-bit");
+      if (saved === "bit16" || saved === "bit64") setBitMode(saved);
+    } catch (_) {}
   </script>
 </body>
 </html>

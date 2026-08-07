@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bebas_Neue, Manrope } from "next/font/google";
+import { Bebas_Neue, Manrope, Pixelify_Sans } from "next/font/google";
 import "./globals.css";
 
 const display = Bebas_Neue({
@@ -13,6 +13,11 @@ const body = Manrope({
   variable: "--font-body",
 });
 
+const pixel = Pixelify_Sans({
+  subsets: ["latin"],
+  variable: "--font-pixel",
+});
+
 export const metadata: Metadata = {
   title: "Hardball — Private Historical Fantasy Baseball",
   description:
@@ -21,7 +26,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} h-full`}>
+    <html
+      lang="en"
+      className={`${display.variable} ${body.variable} ${pixel.variable} h-full`}
+    >
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>
   );
