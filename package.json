@@ -13,6 +13,8 @@
     "db:ingest": "python3 scripts/ingest_fangraphs_careers.py",
     "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
     "test:sim": "tsx scripts/test-construction-sim.ts",
+    "demo:build": "node scripts/build-demo.mjs",
+    "demo": "node scripts/build-demo.mjs && npx --yes serve demo -p 4173",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -36,6 +38,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",

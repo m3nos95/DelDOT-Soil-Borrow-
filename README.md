@@ -12,7 +12,21 @@ Private historical fantasy baseball for you and your friends — inspired by Ima
 - Construction-aware sim: L/R platoon, SP stamina → bullpen, lineup sequencing
 - Day-by-day season simulation with box scores and play-by-play
 
-## Quick start
+## Local HTML demo (no server / no DB)
+
+Try the sim in the browser first — pick two city clubs, auto-build lineups, sim a game with box score + play-by-play:
+
+```bash
+npm run demo
+```
+
+Open [http://localhost:4173](http://localhost:4173). Or open `demo/index.html` directly (keep the three files in `demo/` together).
+
+Rebuild assets after sim changes: `npm run demo:build`.
+
+This uses a ~75-player star subset. The full app below loads every career card for drafts with friends.
+
+## Quick start (full app)
 
 ```bash
 npm install

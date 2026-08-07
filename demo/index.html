@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HARDBALL — local sim demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0a1210;
+      --bg1: #12201c;
+      --chalk: #e8e4d9;
+      --amber: #e8a838;
+      --muted: #8a9a92;
+      --line: rgba(232, 228, 217, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Source Serif 4", Georgia, serif;
+      color: var(--chalk);
+      background:
+        radial-gradient(ellipse 90% 55% at 50% -10%, rgba(232, 168, 56, 0.12), transparent 55%),
+        radial-gradient(ellipse 70% 50% at 80% 100%, rgba(26, 58, 46, 0.55), transparent 50%),
+        linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #0d1814);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    .brand {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: clamp(3.5rem, 12vw, 6rem);
+      letter-spacing: 0.06em;
+      line-height: 0.9;
+      margin: 0;
+      animation: rise 0.8s ease-out both;
+    }
+
+    .tag {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin: 0.75rem 0 0;
+      animation: rise 0.8s ease-out 0.1s both;
+    }
+
+    .lede {
+      max-width: 36rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.55;
+      margin: 1.25rem 0 2rem;
+      animation: rise 0.8s ease-out 0.18s both;
+    }
+
+    .panel {
+      border-top: 1px solid var(--line);
+      padding-top: 1.5rem;
+      animation: rise 0.8s ease-out 0.25s both;
+    }
+
+    .row { display: grid; gap: 1rem; }
+    @media (min-width: 640px) {
+      .row.two { grid-template-columns: 1fr 1fr; }
+    }
+
+    label {
+      display: block;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    select, button { font: inherit; }
+
+    select {
+      width: 100%;
+      background: rgba(10, 18, 16, 0.7);
+      color: var(--chalk);
+      border: 1px solid var(--line);
+      padding: 0.75rem 0.85rem;
+      border-radius: 0;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    button {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: none;
+      cursor: pointer;
+      padding: 0.85rem 1.25rem;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    button:active { transform: translateY(1px); }
+    button.primary {
+      background: var(--amber);
+      color: #1a1205;
+      font-weight: 600;
+    }
+    button.primary:hover { background: #f0b84a; }
+    button.ghost {
+      background: transparent;
+      color: var(--chalk);
+      border: 1px solid var(--line);
+    }
+    button.ghost:hover { border-color: var(--amber); color: var(--amber); }
+
+    .note {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 1rem;
+      line-height: 1.5;
+    }
+    .note code {
+      color: var(--chalk);
+      background: rgba(0,0,0,0.25);
+      padding: 0.1rem 0.35rem;
+    }
+
+    .rosters {
+      display: none;
+      margin-top: 1.5rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .rosters.show { display: grid; gap: 1.25rem; }
+    @media (min-width: 640px) {
+      .rosters.show { grid-template-columns: 1fr 1fr; }
+    }
+    .rosters strong { color: var(--chalk); font-weight: 500; }
+
+    .scoreboard {
+      display: none;
+      margin-top: 2rem;
+      border-top: 1px solid var(--line);
+      padding-top: 1.5rem;
+      animation: rise 0.5s ease-out both;
+    }
+    .scoreboard.show { display: block; }
+
+    .final {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .final .matchup {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: clamp(2rem, 6vw, 3rem);
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+    .final .runs {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 1.5rem;
+      color: var(--amber);
+    }
+    .pitchers {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+
+    .box {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.78rem;
+      margin-bottom: 1.25rem;
+      overflow-x: auto;
+      display: block;
+    }
+    .box th, .box td {
+      border-bottom: 1px solid var(--line);
+      padding: 0.45rem 0.35rem;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .box th:first-child, .box td:first-child { text-align: left; }
+    .box th { color: var(--muted); font-weight: 500; }
+
+    .boxes {
+      display: grid;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (min-width: 800px) {
+      .boxes { grid-template-columns: 1fr 1fr; }
+    }
+    .boxcard h3 {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: 1.6rem;
+      letter-spacing: 0.04em;
+      margin: 0 0 0.5rem;
+    }
+    .stat {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      margin-bottom: 0.75rem;
+    }
+    .stat th, .stat td {
+      border-bottom: 1px solid var(--line);
+      padding: 0.35rem 0.25rem;
+      text-align: right;
+    }
+    .stat th:first-child, .stat td:first-child { text-align: left; }
+    .stat th { color: var(--muted); font-weight: 500; }
+
+    .pbp {
+      max-height: 420px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, 0.25);
+      padding: 0.75rem 1rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      line-height: 1.55;
+      color: #c5d0ca;
+    }
+    .pbp .inning { color: var(--amber); margin-top: 0.65rem; }
+    .pbp .inning:first-child { margin-top: 0; }
+    .pbp .score { color: rgba(232, 228, 217, 0.35); margin-right: 0.5rem; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="brand">HARDBALL</h1>
+    <p class="tag">Local HTML demo · no server</p>
+    <p class="lede">
+      Pick two city clubs, auto-build career lineups from a star subset, and sim a game in your browser.
+      Platoon, stamina, and bullpen roles are live. When you want drafts and friends, use the full Next.js app.
+    </p>
+
+    <div class="panel">
+      <div class="row two">
+        <div>
+          <label for="away">Away</label>
+          <select id="away"></select>
+        </div>
+        <div>
+          <label for="home">Home</label>
+          <select id="home"></select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="simBtn">Sim game</button>
+        <button type="button" class="ghost" id="swapBtn">Swap sides</button>
+      </div>
+      <p class="note">
+        Open <code>demo/index.html</code> in a browser, or run <code>npm run demo</code> from the repo.
+        Star pool only (~75 careers). Full ~23k set is in the online app.
+      </p>
+      <div class="rosters" id="rosters"></div>
+    </div>
+
+    <div class="scoreboard" id="board">
+      <div class="final">
+        <div class="matchup" id="matchup"></div>
+        <div class="runs" id="finalScore"></div>
+      </div>
+      <div class="pitchers" id="pitchers"></div>
+      <table class="box" id="lineScore"></table>
+      <div class="boxes" id="boxes"></div>
+      <div class="pbp" id="pbp"></div>
+    </div>
+  </div>
+
+  <script src="players.embed.js"></script>
+  <script src="sim.bundle.js"></script>
+  <script>
+    const FRANCHISES = [
+      { code: "ARI", city: "Arizona", league: "NL" },
+      { code: "ATL", city: "Atlanta", league: "NL" },
+      { code: "BAL", city: "Baltimore", league: "AL" },
+      { code: "BOS", city: "Boston", league: "AL" },
+      { code: "CHAL", city: "Chicago", league: "AL" },
+      { code: "CHNL", city: "Chicago", league: "NL" },
+      { code: "CIN", city: "Cincinnati", league: "NL" },
+      { code: "CLE", city: "Cleveland", league: "AL" },
+      { code: "COL", city: "Colorado", league: "NL" },
+      { code: "DET", city: "Detroit", league: "AL" },
+      { code: "HOU", city: "Houston", league: "AL" },
+      { code: "KC", city: "Kansas City", league: "AL" },
+      { code: "LAAL", city: "Los Angeles", league: "AL" },
+      { code: "LANL", city: "Los Angeles", league: "NL" },
+      { code: "MIA", city: "Miami", league: "NL" },
+      { code: "MIL", city: "Milwaukee", league: "NL" },
+      { code: "MIN", city: "Minnesota", league: "AL" },
+      { code: "NYAL", city: "New York", league: "AL" },
+      { code: "NYNL", city: "New York", league: "NL" },
+      { code: "OAK", city: "Oakland", league: "AL" },
+      { code: "PHI", city: "Philadelphia", league: "NL" },
+      { code: "PIT", city: "Pittsburgh", league: "NL" },
+      { code: "SD", city: "San Diego", league: "NL" },
+      { code: "SF", city: "San Francisco", league: "NL" },
+      { code: "SEA", city: "Seattle", league: "AL" },
+      { code: "STL", city: "St. Louis", league: "NL" },
+      { code: "TB", city: "Tampa Bay", league: "AL" },
+      { code: "TEX", city: "Texas", league: "AL" },
+      { code: "TOR", city: "Toronto", league: "AL" },
+      { code: "WSH", city: "Washington", league: "NL" },
+    ];
+
+    const POS_ORDER = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
+
+    function hashSeed(str) {
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return () => {
+        t += 0x6d2b79f5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function franchiseByCode(code) {
+      return FRANCHISES.find((f) => f.code === code);
+    }
+
+    function label(f) {
+      return f.city + " " + f.league + " (" + f.code + ")";
+    }
+
+    function fillSelects() {
+      const away = document.getElementById("away");
+      const home = document.getElementById("home");
+      FRANCHISES.forEach((f) => {
+        const o1 = document.createElement("option");
+        o1.value = f.code;
+        o1.textContent = label(f);
+        away.appendChild(o1);
+        const o2 = document.createElement("option");
+        o2.value = f.code;
+        o2.textContent = label(f);
+        home.appendChild(o2);
+      });
+      away.value = "BOS";
+      home.value = "NYAL";
+    }
+
+    function toSimPlayer(raw) {
+      const speed = HardballSim.deriveSpeed(raw);
+      return {
+        id: String(raw.fangraphsId),
+        name: raw.name,
+        primaryPos: raw.primaryPos,
+        isPitcher: !!raw.isPitcher,
+        bats: raw.bats || "R",
+        throws: raw.throws || "R",
+        kRate: raw.kRate,
+        bbRate: raw.bbRate,
+        hbpRate: raw.hbpRate,
+        singleRate: raw.singleRate,
+        doubleRate: raw.doubleRate,
+        tripleRate: raw.tripleRate,
+        hrRate: raw.hrRate,
+        stuff: raw.stuff,
+        control: raw.control,
+        durability: raw.durability ?? 50,
+        speed,
+      };
+    }
+
+    function posFit(player, slot) {
+      const p = player.primaryPos;
+      if (slot === "DH") return !player.isPitcher;
+      if (slot === "LF" || slot === "RF") return p === "CF" || p === "LF" || p === "RF" || p === "UTIL";
+      if (slot === "CF") return p === "CF" || p === "UTIL";
+      if (slot === "C") return p === "C" || p === "UTIL";
+      if (slot === p) return true;
+      if (p === "UTIL") return true;
+      return false;
+    }
+
+    /** Split the star pool into two clubs with a seeded shuffle so matchups differ. */
+    function dealClubs(seed) {
+      const rand = mulberry32(seed);
+      const bats = DEMO_PLAYERS.filter((p) => !p.isPitcher).slice();
+      const arms = DEMO_PLAYERS.filter((p) => p.isPitcher).slice();
+      // Fisher–Yates
+      for (const arr of [bats, arms]) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(rand() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      }
+      bats.sort((a, b) => b.careerWAR - a.careerWAR);
+      arms.sort((a, b) => b.careerWAR - a.careerWAR);
+
+      const awayBats = [];
+      const homeBats = [];
+      bats.forEach((p, i) => (i % 2 === 0 ? awayBats : homeBats).push(p));
+      const awayArms = [];
+      const homeArms = [];
+      arms.forEach((p, i) => (i % 2 === 0 ? awayArms : homeArms).push(p));
+
+      return {
+        away: buildClub(awayBats, awayArms),
+        home: buildClub(homeBats, homeArms),
+      };
+    }
+
+    function buildClub(batPool, armPool) {
+      const used = new Set();
+      const takeBat = (pred) => {
+        const hit = batPool.find((p) => !used.has(p.fangraphsId) && pred(p));
+        if (!hit) return null;
+        used.add(hit.fangraphsId);
+        return hit;
+      };
+
+      const lineup = [];
+      for (const slot of POS_ORDER) {
+        let p = takeBat((x) => posFit(x, slot));
+        if (!p) p = takeBat(() => true);
+        if (!p) throw new Error("Not enough batters in demo pool");
+        lineup.push({ raw: p, position: slot });
+      }
+
+      const usedArms = new Set();
+      const takeArm = (pred) => {
+        const hit = armPool.find((p) => !usedArms.has(p.fangraphsId) && pred(p));
+        if (!hit) return null;
+        usedArms.add(hit.fangraphsId);
+        return hit;
+      };
+
+      // Closers: lower durability arms first (Rivera / Hoffman style), else top remaining
+      const closers = armPool
+        .filter((p) => (p.durability ?? 99) < 60)
+        .sort((a, b) => b.careerWAR - a.careerWAR);
+      const starterPool = armPool
+        .filter((p) => (p.durability ?? 99) >= 60)
+        .sort((a, b) => b.careerWAR - a.careerWAR);
+
+      const rotation = [];
+      for (let i = 0; i < 5; i++) {
+        const p = takeArm((x) => starterPool.includes(x)) || takeArm(() => true);
+        if (p) rotation.push(p);
+      }
+
+      const bullpen = [];
+      const cl = takeArm((x) => closers.includes(x)) || takeArm(() => true);
+      if (cl) bullpen.push({ raw: cl, role: "CL" });
+      for (const role of ["SU", "SU", "LR", "LR"]) {
+        const p = takeArm(() => true);
+        if (p) bullpen.push({ raw: p, role });
+      }
+
+      const starter = rotation[0];
+      if (!starter) throw new Error("Not enough pitchers in demo pool");
+
+      return { lineup, rotation, bullpen, starter };
+    }
+
+    function clubToSim(club) {
+      const lineupEntries = club.lineup.map((slot, i) => ({
+        player: toSimPlayer(slot.raw),
+        battingOrder: i + 1,
+        position: slot.position,
+      }));
+      const staff = [
+        { player: toSimPlayer(club.starter), role: "SP" },
+        ...club.bullpen.map((a) => ({
+          player: toSimPlayer(a.raw),
+          role: a.role,
+        })),
+      ];
+      return { lineupEntries, staff };
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function showRosters(awayClub, homeClub, awayF, homeF) {
+      const fmt = (club, f) => {
+        const bats = club.lineup
+          .map((s, i) => (i + 1) + ". " + s.raw.name + " (" + s.position + ")")
+          .join("<br>");
+        const staff =
+          "SP " +
+          club.starter.name +
+          "<br>Pen: " +
+          club.bullpen.map((a) => a.raw.name + " " + a.role).join(", ");
+        return (
+          "<div><strong>" +
+          f.city +
+          " " +
+          f.league +
+          "</strong><br>" +
+          bats +
+          "<br>" +
+          staff +
+          "</div>"
+        );
+      };
+      const el = document.getElementById("rosters");
+      el.innerHTML = fmt(awayClub, awayF) + fmt(homeClub, homeF);
+      el.classList.add("show");
+    }
+
+    function halfLines(innings) {
+      const away = [];
+      const home = [];
+      for (let i = 0; i < innings.length; i++) {
+        if (i % 2 === 0) away.push(innings[i]);
+        else home.push(innings[i]);
+      }
+      return { away, home };
+    }
+
+    function renderLineScore(awayF, homeF, result) {
+      const lines = halfLines(result.innings);
+      const n = Math.max(lines.away.length, lines.home.length, 9);
+      let head = "<tr><th></th>";
+      for (let i = 1; i <= n; i++) head += "<th>" + i + "</th>";
+      head += "<th>R</th></tr>";
+
+      const awayHits = (result.awayBox.batters || []).reduce((s, b) => s + b.h, 0);
+      const homeHits = (result.homeBox.batters || []).reduce((s, b) => s + b.h, 0);
+
+      const row = (code, line, runs) => {
+        let cells = "<tr><td>" + code + "</td>";
+        for (let i = 0; i < n; i++) {
+          const v = line[i];
+          cells += "<td>" + (v === undefined ? "" : v) + "</td>";
+        }
+        cells += "<td>" + runs + "</td></tr>";
+        return cells;
+      };
+
+      document.getElementById("lineScore").innerHTML =
+        head +
+        row(awayF.code, lines.away, result.awayScore) +
+        row(homeF.code, lines.home, result.homeScore);
+
+      // stash hits for pitchers line
+      document.getElementById("pitchers").textContent =
+        result.awayPitcher +
+        " vs " +
+        result.homePitcher +
+        " · H " +
+        awayHits +
+        "-" +
+        homeHits;
+    }
+
+    function renderBoxes(awayF, homeF, result) {
+      const fmtIp = HardballSim.formatIp;
+      const side = (title, box) => {
+        const bats = (box.batters || [])
+          .map(
+            (b) =>
+              "<tr><td>" +
+              escapeHtml(b.name) +
+              "</td><td>" +
+              b.ab +
+              "</td><td>" +
+              b.r +
+              "</td><td>" +
+              b.h +
+              "</td><td>" +
+              b.rbi +
+              "</td><td>" +
+              b.bb +
+              "</td><td>" +
+              b.so +
+              "</td><td>" +
+              b.hr +
+              "</td><td>" +
+              (b.sb || 0) +
+              "</td></tr>",
+          )
+          .join("");
+        const arms = (box.pitchers || [])
+          .map(
+            (p) =>
+              "<tr><td>" +
+              escapeHtml(p.name) +
+              (p.decision ? " (" + p.decision + ")" : "") +
+              "</td><td>" +
+              fmtIp(p.ip) +
+              "</td><td>" +
+              p.h +
+              "</td><td>" +
+              p.r +
+              "</td><td>" +
+              p.er +
+              "</td><td>" +
+              p.bb +
+              "</td><td>" +
+              p.so +
+              "</td></tr>",
+          )
+          .join("");
+        return (
+          '<div class="boxcard"><h3>' +
+          escapeHtml(title) +
+          "</h3>" +
+          '<table class="stat"><thead><tr><th>Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>SO</th><th>HR</th><th>SB</th></tr></thead><tbody>' +
+          bats +
+          "</tbody></table>" +
+          '<table class="stat"><thead><tr><th>Pitcher</th><th>IP</th><th>H</th><th>R</th><th>ER</th><th>BB</th><th>SO</th></tr></thead><tbody>' +
+          arms +
+          "</tbody></table></div>"
+        );
+      };
+      document.getElementById("boxes").innerHTML =
+        side(awayF.city + " " + awayF.league, result.awayBox) +
+        side(homeF.city + " " + homeF.league, result.homeBox);
+    }
+
+    function renderPbp(plays) {
+      document.getElementById("pbp").innerHTML = (plays || [])
+        .map((p) => {
+          const inn = p.text && p.text.startsWith("===");
+          if (inn) {
+            return '<div class="inning">' + escapeHtml(p.text) + "</div>";
+          }
+          return (
+            "<div><span class=\"score\">" +
+            p.awayScore +
+            "-" +
+            p.homeScore +
+            "</span>" +
+            escapeHtml(p.text) +
+            "</div>"
+          );
+        })
+        .join("");
+    }
+
+    function simGame() {
+      if (!window.HardballSim || !window.DEMO_PLAYERS) {
+        alert(
+          "Sim files failed to load. Keep index.html, players.embed.js, and sim.bundle.js in the same folder.",
+        );
+        return;
+      }
+      const awayCode = document.getElementById("away").value;
+      const homeCode = document.getElementById("home").value;
+      if (awayCode === homeCode) {
+        alert("Pick two different clubs.");
+        return;
+      }
+
+      const awayF = franchiseByCode(awayCode);
+      const homeF = franchiseByCode(homeCode);
+      const seed = (Date.now() ^ hashSeed(awayCode + homeCode)) >>> 0;
+      const dealt = dealClubs(hashSeed(awayCode + "|" + homeCode + "|" + (seed % 97)));
+      showRosters(dealt.away, dealt.home, awayF, homeF);
+
+      const away = clubToSim(dealt.away);
+      const home = clubToSim(dealt.home);
+
+      const result = HardballSim.simulateGame({
+        awayLineup: away.lineupEntries,
+        homeLineup: home.lineupEntries,
+        awayStaff: away.staff,
+        homeStaff: home.staff,
+        seed,
+      });
+
+      document.getElementById("matchup").textContent =
+        awayF.city + " " + awayF.league + " @ " + homeF.city + " " + homeF.league;
+      document.getElementById("finalScore").textContent =
+        result.awayScore + " – " + result.homeScore;
+      renderLineScore(awayF, homeF, result);
+      renderBoxes(awayF, homeF, result);
+      renderPbp(result.playByPlay);
+
+      const board = document.getElementById("board");
+      board.classList.add("show");
+      board.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    document.getElementById("simBtn").addEventListener("click", simGame);
+    document.getElementById("swapBtn").addEventListener("click", () => {
+      const a = document.getElementById("away");
+      const h = document.getElementById("home");
+      const tmp = a.value;
+      a.value = h.value;
+      h.value = tmp;
+    });
+
+    fillSelects();
+  </script>
+</body>
+</html>
