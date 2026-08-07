@@ -4,12 +4,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "", label: "Overview", statuses: ["drafting", "season", "complete", "forming"] },
+  {
+    href: "",
+    label: "Overview",
+    statuses: ["drafting", "season", "complete", "forming"],
+  },
   { href: "/draft", label: "Draft", statuses: ["drafting"] },
+  {
+    href: "/free-agency",
+    label: "Free agents",
+    statuses: ["season"],
+  },
+  { href: "/trades", label: "Trades", statuses: ["season", "drafting"] },
   { href: "/team", label: "Lineup", statuses: ["drafting", "season", "complete"] },
   {
     href: "/standings",
     label: "Standings",
+    statuses: ["season", "complete"],
+  },
+  {
+    href: "/stats",
+    label: "Stats",
     statuses: ["season", "complete"],
   },
 ] as const;
@@ -32,9 +47,7 @@ export function LeagueNav({
       {items.map((item) => {
         const href = `${base}${item.href}`;
         const active =
-          item.href === ""
-            ? pathname === base
-            : pathname.startsWith(href);
+          item.href === "" ? pathname === base : pathname.startsWith(href);
         return (
           <Link
             key={item.href || "overview"}

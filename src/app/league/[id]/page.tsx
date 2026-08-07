@@ -40,8 +40,12 @@ export default async function LeaguePage({
     redirect("/clubhouse");
   }
 
+  const humanTeams = league.teams.filter((t) => !t.isCpu);
   const allReady =
-    league.teams.length >= 2 && league.teams.every((t) => t.draftReady);
+    humanTeams.length >= 1 &&
+    humanTeams.every((t) => t.draftReady) &&
+    league.teams.filter((t) => t.isCpu).every((t) => t.draftReady);
+  const openSlots = league.maxTeams - league.teams.length;
   const nextDay = await prisma.game.findFirst({
     where: { leagueId: id, status: "scheduled" },
     orderBy: { dayNumber: "asc" },
@@ -102,7 +106,7 @@ export default async function LeaguePage({
                     <span>
                       {t.abbreviation}{" "}
                       <span className="text-[var(--fog)]">
-                        {t.owner.displayName}
+                        {t.isCpu ? "CPU" : t.owner.displayName}
                       </span>
                     </span>
                     <span
@@ -115,11 +119,22 @@ export default async function LeaguePage({
                   </li>
                 ))}
               </ul>
+              {openSlots > 0 ? (
+                <p className="mb-4 text-sm text-[var(--fog)]">
+                  {openSlots} open slot{openSlots === 1 ? "" : "s"} — fill with
+                  CPU or invite friends.
+                </p>
+              ) : null}
               {league.commissionerId === session.id ? (
-                <CommissionerStart leagueId={id} canStart={allReady} />
+                <CommissionerStart
+                  leagueId={id}
+                  canStart={allReady}
+                  canFillCpu={openSlots > 0}
+                />
               ) : (
                 <p className="text-sm text-[var(--fog)]">
-                  Commissioner starts when everyone locks.
+                  Commissioner starts when human owners lock. Empty slots become
+                  CPU.
                 </p>
               )}
             </div>
@@ -141,6 +156,9 @@ export default async function LeaguePage({
                     <div>
                       <span className="mr-2 text-[var(--fog)]">{i + 1}.</span>
                       {t.abbreviation}
+                      {t.isCpu ? (
+                        <span className="ml-2 text-[var(--fog)]">CPU</span>
+                      ) : null}
                       {t.id === myTeam?.id ? (
                         <span className="ml-2 text-[var(--foul)]">you</span>
                       ) : null}

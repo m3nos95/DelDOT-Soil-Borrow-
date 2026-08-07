@@ -14,6 +14,8 @@
     "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
     "test:sim": "tsx scripts/test-construction-sim.ts",
     "test:era": "tsx scripts/test-era-lock.ts",
+    "test:gm": "tsx scripts/test-gm.ts",
+    "test:cpu": "tsx scripts/test-cpu-season.ts",
     "demo:build": "node scripts/build-demo.mjs",
     "demo": "node scripts/build-demo.mjs && npx --yes serve demo -p 4173",
     "postinstall": "prisma generate"

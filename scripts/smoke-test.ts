@@ -2,11 +2,11 @@ import "dotenv/config";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client";
 import bcrypt from "bcryptjs";
+import { autoDraftTeam } from "../src/lib/cpu";
 import {
   generateInviteCode,
   startSeason,
   simulateNextDay,
-  ensureDefaultLineup,
 } from "../src/lib/league";
 
 const adapter = new PrismaBetterSqlite3({
@@ -23,76 +23,6 @@ async function ensureUser(username: string, displayName: string) {
       displayName,
       passwordHash: await bcrypt.hash("hardball", 10),
     },
-  });
-}
-
-async function autoDraft(teamId: string, leagueId: string, seed: number) {
-  const league = await prisma.league.findUniqueOrThrow({ where: { id: leagueId } });
-  const taken = new Set(
-    (
-      await prisma.rosterSpot.findMany({
-        where: { team: { leagueId } },
-      })
-    ).map((r) => r.playerId),
-  );
-
-  const all = await prisma.player.findMany();
-  const cheapFirst = [...all].sort((a, b) => {
-    if (a.salary !== b.salary) return a.salary - b.salary;
-    return (
-      ((a.name.charCodeAt(0) + seed) % 13) - ((b.name.charCodeAt(0) + seed) % 13)
-    );
-  });
-
-  let payroll = 0;
-  let hitters = 0;
-  let pitchers = 0;
-
-  const take = async (p: (typeof all)[number]) => {
-    await prisma.rosterSpot.create({ data: { teamId, playerId: p.id } });
-    taken.add(p.id);
-    payroll += p.salary;
-    if (p.isPitcher) pitchers += 1;
-    else hitters += 1;
-  };
-
-  for (const p of cheapFirst) {
-    if (taken.has(p.id)) continue;
-    if (payroll + p.salary > league.salaryCap) continue;
-    if (!p.isPitcher && hitters < 10) await take(p);
-    else if (p.isPitcher && pitchers < 6) await take(p);
-    if (hitters >= 10 && pitchers >= 6) break;
-  }
-
-  const stars = [...all].sort((a, b) => b.salary - a.salary);
-  let starsTaken = 0;
-  for (const p of stars) {
-    if (taken.has(p.id)) continue;
-    if (payroll + p.salary > league.salaryCap) continue;
-    if (!p.isPitcher && hitters >= 14) continue;
-    if (p.isPitcher && pitchers >= 11) continue;
-    await take(p);
-    starsTaken += 1;
-    if (starsTaken >= 4) break;
-  }
-
-  for (const p of cheapFirst) {
-    if (taken.has(p.id)) continue;
-    if (payroll + p.salary > league.salaryCap) continue;
-    if (!p.isPitcher && hitters >= 12) continue;
-    if (p.isPitcher && pitchers >= 8) continue;
-    await take(p);
-    if (hitters + pitchers >= 20) break;
-  }
-
-  if (hitters < 10 || pitchers < 6) {
-    throw new Error(`Auto-draft underfilled (${hitters}H/${pitchers}P, $${payroll})`);
-  }
-
-  await ensureDefaultLineup(teamId);
-  await prisma.team.update({
-    where: { id: teamId },
-    data: { draftReady: true },
   });
 }
 
@@ -129,14 +59,25 @@ async function main() {
     include: { teams: true },
   });
 
-  await autoDraft(league.teams[0].id, league.id, 1);
-  await autoDraft(league.teams[1].id, league.id, 4);
+  await autoDraftTeam(league.teams[0].id, 1);
+  await autoDraftTeam(league.teams[1].id, 4);
   await startSeason(league.id);
 
   for (let i = 0; i < 3; i++) {
     const res = await simulateNextDay(league.id);
     console.log(`Sim day ${res.dayNumber}: ${res.simulated} games`);
   }
+
+  const batStats = await prisma.seasonBattingStat.count({
+    where: { leagueId: league.id },
+  });
+  const pitStats = await prisma.seasonPitchingStat.count({
+    where: { leagueId: league.id },
+  });
+  if (batStats < 1 || pitStats < 1) {
+    throw new Error(`Season stats missing (bat ${batStats}, pit ${pitStats})`);
+  }
+  console.log(`Season stats rows: ${batStats} batting, ${pitStats} pitching`);
 
   const standings = await prisma.team.findMany({
     where: { leagueId: league.id },

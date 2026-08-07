@@ -73,6 +73,11 @@ export default async function StandingsPage({
                   <td className="px-4 py-3">
                     {t.name}{" "}
                     <span className="text-[var(--fog)]">({t.abbreviation})</span>
+                    {t.isCpu ? (
+                      <span className="ml-2 text-xs uppercase tracking-wider text-[var(--fog)]">
+                        CPU
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3 font-mono">{t.wins}</td>
                   <td className="px-4 py-3 font-mono">{t.losses}</td>

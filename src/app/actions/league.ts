@@ -10,15 +10,29 @@ import {
 } from "@/lib/environment";
 import { getFranchise } from "@/lib/franchises";
 import {
+  evaluateIncomingTradeAsCpu,
+  fillCpuTeams,
+  runCpuFrontOffice,
+} from "@/lib/cpu";
+import { evaluateTradeForTeam, type GmPlayer } from "@/lib/gm";
+import {
   draftedPlayerIds,
   generateInviteCode,
   getLeaguePayroll,
   simulateNextDay,
   simulateScheduledGame,
   startSeason,
+  ensureDefaultLineup,
 } from "@/lib/league";
+import {
+  applyTradeAssets,
+  cancelTrade,
+  executeTrade,
+  rejectTrade,
+  validateTradePieces,
+} from "@/lib/trades";
 
-export type ActionState = { error?: string; ok?: boolean };
+export type ActionState = { error?: string; ok?: boolean; message?: string };
 
 async function mustUser() {
   const user = await requireUser();
@@ -40,7 +54,7 @@ export async function createLeagueAction(
   const user = await mustUser();
   const name = String(formData.get("name") ?? "").trim();
   const maxTeams = Number(formData.get("maxTeams") ?? 6);
-  const gamesPerTeam = Number(formData.get("gamesPerTeam") ?? 20);
+  const gamesPerTeam = Number(formData.get("gamesPerTeam") ?? 162);
   const eraId = String(formData.get("era") ?? "modern").trim();
   if (!["pre1950", "classic", "freeagent", "modern", "open"].includes(eraId)) {
     return { error: "Pick a dynasty era" };
@@ -107,7 +121,7 @@ export async function joinLeagueAction(
   if (league.status !== "drafting" && league.status !== "forming") {
     return { error: "That league is no longer accepting teams" };
   }
-  if (league.teams.some((t) => t.ownerId === user.id)) {
+  if (league.teams.some((t) => t.ownerId === user.id && !t.isCpu)) {
     redirect(`/league/${league.id}`);
   }
   if (league.teams.length >= league.maxTeams) {
@@ -228,6 +242,28 @@ export async function setDraftReadyAction(
   return { ok: true };
 }
 
+export async function fillCpuTeamsAction(leagueId: string): Promise<ActionState> {
+  const user = await mustUser();
+  const league = await prisma.league.findUnique({ where: { id: leagueId } });
+  if (!league) return { error: "League not found" };
+  if (league.commissionerId !== user.id) {
+    return { error: "Only the commissioner can fill CPU teams" };
+  }
+  try {
+    const res = await fillCpuTeams(leagueId);
+    revalidatePath(`/league/${leagueId}`);
+    revalidatePath(`/league/${leagueId}/draft`);
+    return {
+      ok: true,
+      message: res.created
+        ? `Filled ${res.created} CPU team${res.created === 1 ? "" : "s"}`
+        : "League already full",
+    };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not fill CPU teams" };
+  }
+}
+
 export async function startSeasonAction(leagueId: string): Promise<ActionState> {
   const user = await mustUser();
   const league = await prisma.league.findUnique({
@@ -239,6 +275,10 @@ export async function startSeasonAction(leagueId: string): Promise<ActionState> 
     return { error: "Only the commissioner can start the season" };
   }
   try {
+    // Pad empty slots with auto-drafted CPU clubs, then start
+    if (league.teams.length < league.maxTeams) {
+      await fillCpuTeams(leagueId);
+    }
     await startSeason(leagueId);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not start" };
@@ -313,21 +353,50 @@ export async function saveStaffAction(
   return { ok: true };
 }
 
+async function assertLeagueMember(leagueId: string, userId: string) {
+  const league = await prisma.league.findUnique({ where: { id: leagueId } });
+  if (!league) return { error: "League not found" as const };
+  const member = await prisma.team.findFirst({
+    where: { leagueId, ownerId: userId, isCpu: false },
+  });
+  if (!member && league.commissionerId !== userId) {
+    return { error: "Not in this league" as const };
+  }
+  return { league, member };
+}
+
 export async function simDayAction(leagueId: string): Promise<ActionState> {
   const user = await mustUser();
-  const league = await prisma.league.findUnique({ where: { id: leagueId } });
-  if (!league) return { error: "League not found" };
-  if (league.status !== "season") return { error: "Season not running" };
-  const member = await prisma.team.findFirst({
-    where: { leagueId, ownerId: user.id },
-  });
-  if (!member && league.commissionerId !== user.id) {
-    return { error: "Not in this league" };
-  }
+  const gate = await assertLeagueMember(leagueId, user.id);
+  if ("error" in gate && gate.error) return { error: gate.error };
+  if (gate.league!.status !== "season") return { error: "Season not running" };
 
+  await runCpuFrontOffice(leagueId);
   await simulateNextDay(leagueId);
   revalidatePath(`/league/${leagueId}`);
   revalidatePath(`/league/${leagueId}/standings`);
+  revalidatePath(`/league/${leagueId}/stats`);
+  revalidatePath(`/league/${leagueId}/free-agency`);
+  revalidatePath(`/league/${leagueId}/trades`);
+  return { ok: true };
+}
+
+export async function simWeekAction(leagueId: string): Promise<ActionState> {
+  const user = await mustUser();
+  const gate = await assertLeagueMember(leagueId, user.id);
+  if ("error" in gate && gate.error) return { error: gate.error };
+  if (gate.league!.status !== "season") return { error: "Season not running" };
+
+  for (let i = 0; i < 7; i++) {
+    await runCpuFrontOffice(leagueId);
+    const res = await simulateNextDay(leagueId);
+    if (!res.simulated) break;
+  }
+  revalidatePath(`/league/${leagueId}`);
+  revalidatePath(`/league/${leagueId}/standings`);
+  revalidatePath(`/league/${leagueId}/stats`);
+  revalidatePath(`/league/${leagueId}/free-agency`);
+  revalidatePath(`/league/${leagueId}/trades`);
   return { ok: true };
 }
 
@@ -353,4 +422,230 @@ export async function simGameAction(
 
 export async function getPayrollAction(teamId: string) {
   return getLeaguePayroll(teamId);
+}
+
+function toGm(p: {
+  id: string;
+  name: string;
+  primaryPos: string;
+  positions: string;
+  isPitcher: boolean;
+  salary: number;
+  careerWAR: number;
+  stuff: number;
+  durability: number;
+}): GmPlayer {
+  return {
+    id: p.id,
+    name: p.name,
+    primaryPos: p.primaryPos,
+    positions: p.positions,
+    isPitcher: p.isPitcher,
+    salary: p.salary,
+    careerWAR: p.careerWAR,
+    stuff: p.stuff,
+    durability: p.durability,
+  };
+}
+
+export async function signFreeAgentAction(
+  leagueId: string,
+  playerId: string,
+): Promise<ActionState> {
+  const user = await mustUser();
+  const team = await prisma.team.findFirst({
+    where: { leagueId, ownerId: user.id, isCpu: false },
+    include: { roster: { include: { player: true } }, league: true },
+  });
+  if (!team) return { error: "You are not in this league" };
+  if (team.league.status !== "season") {
+    return { error: "Free agency opens once the season starts" };
+  }
+
+  const taken = await draftedPlayerIds(leagueId);
+  if (taken.has(playerId)) return { error: "Player is already on a roster" };
+
+  const player = await prisma.player.findUnique({ where: { id: playerId } });
+  if (!player) return { error: "Player not found" };
+  const era = dynastyEraById(team.league.era);
+  if (!playerInDynastyEra(player.yearFrom, player.yearTo, era)) {
+    return { error: `${player.name} is outside this league’s era` };
+  }
+
+  const payroll = team.roster.reduce((s, r) => s + r.player.salary, 0);
+  if (payroll + player.salary > team.league.salaryCap) {
+    return { error: "Over the salary cap" };
+  }
+  const hitters = team.roster.filter((r) => !r.player.isPitcher).length;
+  const pitchers = team.roster.filter((r) => r.player.isPitcher).length;
+  if (!player.isPitcher && hitters >= 14) return { error: "Max 14 position players" };
+  if (player.isPitcher && pitchers >= 11) return { error: "Max 11 pitchers" };
+  if (team.roster.length >= 25) return { error: "Roster is full (25)" };
+
+  await prisma.rosterSpot.create({ data: { teamId: team.id, playerId } });
+  await ensureDefaultLineup(team.id);
+
+  revalidatePath(`/league/${leagueId}`);
+  revalidatePath(`/league/${leagueId}/free-agency`);
+  revalidatePath(`/league/${leagueId}/team`);
+  revalidatePath(`/league/${leagueId}/draft`);
+  return { ok: true };
+}
+
+export async function cutPlayerAction(
+  leagueId: string,
+  playerId: string,
+): Promise<ActionState> {
+  const user = await mustUser();
+  const team = await prisma.team.findFirst({
+    where: { leagueId, ownerId: user.id, isCpu: false },
+    include: { league: true, roster: { include: { player: true } } },
+  });
+  if (!team) return { error: "You are not in this league" };
+  if (team.league.status !== "season") {
+    return { error: "Use the draft board to drop players before the season" };
+  }
+  const spot = team.roster.find((r) => r.playerId === playerId);
+  if (!spot) return { error: "Player not on your roster" };
+
+  const hitters = team.roster.filter((r) => !r.player.isPitcher).length;
+  const pitchers = team.roster.filter((r) => r.player.isPitcher).length;
+  if (!spot.player.isPitcher && hitters <= 9) {
+    return { error: "Need at least 9 hitters" };
+  }
+  if (spot.player.isPitcher && pitchers <= 5) {
+    return { error: "Need at least 5 pitchers" };
+  }
+
+  await prisma.lineupSlot.deleteMany({ where: { teamId: team.id, playerId } });
+  await prisma.staffSlot.deleteMany({ where: { teamId: team.id, playerId } });
+  await prisma.rosterSpot.deleteMany({ where: { teamId: team.id, playerId } });
+  await ensureDefaultLineup(team.id);
+
+  revalidatePath(`/league/${leagueId}`);
+  revalidatePath(`/league/${leagueId}/free-agency`);
+  revalidatePath(`/league/${leagueId}/team`);
+  return { ok: true };
+}
+
+export async function proposeTradeAction(
+  leagueId: string,
+  partnerTeamId: string,
+  givePlayerIds: string[],
+  getPlayerIds: string[],
+): Promise<ActionState> {
+  const user = await mustUser();
+  const myTeam = await prisma.team.findFirst({
+    where: { leagueId, ownerId: user.id, isCpu: false },
+  });
+  if (!myTeam) return { error: "You are not in this league" };
+
+  try {
+    await validateTradePieces({
+      leagueId,
+      proposerTeamId: myTeam.id,
+      partnerTeamId,
+      proposerPlayerIds: givePlayerIds,
+      partnerPlayerIds: getPlayerIds,
+    });
+
+    const partner = await prisma.team.findFirst({
+      where: { id: partnerTeamId, leagueId },
+      include: { roster: { include: { player: true } }, league: true },
+    });
+    if (!partner) return { error: "Partner team not found" };
+
+    const trade = await executeTrade({
+      leagueId,
+      proposerTeamId: myTeam.id,
+      partnerTeamId,
+      proposerPlayerIds: givePlayerIds,
+      partnerPlayerIds: getPlayerIds,
+      note: "Human proposal",
+      autoAccept: false,
+    });
+
+    if (partner.isCpu) {
+      const decision = await evaluateIncomingTradeAsCpu(trade.id);
+      if (decision.accept) {
+        await applyTradeAssets(trade.id);
+        revalidatePath(`/league/${leagueId}/trades`);
+        revalidatePath(`/league/${leagueId}/team`);
+        return { ok: true, message: `CPU accepted: ${decision.reason}` };
+      }
+      await rejectTrade(trade.id);
+      return { error: `CPU declined: ${decision.reason}` };
+    }
+
+    revalidatePath(`/league/${leagueId}/trades`);
+    return { ok: true, message: "Trade offer sent" };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Trade failed" };
+  }
+}
+
+export async function respondTradeAction(
+  leagueId: string,
+  tradeId: string,
+  accept: boolean,
+): Promise<ActionState> {
+  const user = await mustUser();
+  const myTeam = await prisma.team.findFirst({
+    where: { leagueId, ownerId: user.id, isCpu: false },
+  });
+  if (!myTeam) return { error: "You are not in this league" };
+
+  const trade = await prisma.trade.findFirst({
+    where: { id: tradeId, leagueId, status: "pending" },
+    include: {
+      assets: { include: { player: true } },
+      league: true,
+    },
+  });
+  if (!trade) return { error: "Trade not found" };
+
+  const isPartner = trade.partnerTeamId === myTeam.id;
+  const isProposer = trade.proposerTeamId === myTeam.id;
+  if (!isPartner && !(isProposer && !accept)) {
+    return { error: "Not your trade to decide" };
+  }
+
+  if (!accept) {
+    if (isProposer) await cancelTrade(tradeId);
+    else await rejectTrade(tradeId);
+    revalidatePath(`/league/${leagueId}/trades`);
+    return { ok: true, message: isProposer ? "Offer withdrawn" : "Trade rejected" };
+  }
+
+  // Human accept — still run fairness sanity for their own roster health
+  const give = trade.assets
+    .filter((a) => a.fromTeamId === myTeam.id)
+    .map((a) => toGm(a.player));
+  const get = trade.assets
+    .filter((a) => a.fromTeamId !== myTeam.id)
+    .map((a) => toGm(a.player));
+  const rosterSpots = await prisma.rosterSpot.findMany({
+    where: { teamId: myTeam.id },
+    include: { player: true },
+  });
+  const check = evaluateTradeForTeam({
+    roster: rosterSpots.map((s) => toGm(s.player)),
+    give,
+    get,
+    salaryCap: trade.league.salaryCap,
+    currentPayroll: rosterSpots.reduce((s, r) => s + r.player.salary, 0),
+  });
+  if (!check.accept && check.reason.includes("cap")) {
+    return { error: check.reason };
+  }
+
+  try {
+    await applyTradeAssets(tradeId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Could not complete trade" };
+  }
+  revalidatePath(`/league/${leagueId}/trades`);
+  revalidatePath(`/league/${leagueId}/team`);
+  revalidatePath(`/league/${leagueId}/stats`);
+  return { ok: true, message: "Trade completed" };
 }

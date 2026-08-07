@@ -7,6 +7,7 @@ import {
 } from "./environment";
 import type { Hand, SimPlayer, LineupEntry, StaffArm, BullpenRole } from "./sim";
 import { deriveDefense, deriveSpeed, simulateGame } from "./sim";
+import { applyBoxToSeasonStats } from "./stats";
 
 export { PARKS } from "./constants";
 
@@ -357,6 +358,21 @@ export async function simulateScheduledGame(gameId: string) {
     }),
   ]);
 
+  await applyBoxToSeasonStats({
+    leagueId: game.leagueId,
+    teamId: game.homeTeamId,
+    batters: result.homeBox.batters,
+    pitchers: result.homeBox.pitchers,
+    starterPlayerId: home.pitcher.id,
+  });
+  await applyBoxToSeasonStats({
+    leagueId: game.leagueId,
+    teamId: game.awayTeamId,
+    batters: result.awayBox.batters,
+    pitchers: result.awayBox.pitchers,
+    starterPlayerId: away.pitcher.id,
+  });
+
   const leagueGames = await prisma.game.count({
     where: { leagueId: game.leagueId, status: "scheduled" },
   });
@@ -385,4 +401,16 @@ export async function simulateNextDay(leagueId: string) {
     await simulateScheduledGame(g.id);
   }
   return { simulated: games.length, dayNumber };
+}
+
+export async function simulateDays(leagueId: string, days: number) {
+  let total = 0;
+  let lastDay: number | null = null;
+  for (let i = 0; i < days; i++) {
+    const res = await simulateNextDay(leagueId);
+    if (!res.simulated) break;
+    total += res.simulated;
+    lastDay = res.dayNumber;
+  }
+  return { simulated: total, dayNumber: lastDay };
 }

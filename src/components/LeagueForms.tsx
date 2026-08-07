@@ -81,9 +81,9 @@ export function CreateLeagueForm() {
             id="gamesPerTeam"
             name="gamesPerTeam"
             className="field-input"
-            defaultValue="20"
+            defaultValue="162"
           >
-            {[10, 20, 40, 60, 100, 162].map((n) => (
+            {[20, 40, 60, 100, 162].map((n) => (
               <option key={n} value={n}>
                 {n} games
               </option>

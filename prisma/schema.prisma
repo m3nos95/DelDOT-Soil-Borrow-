@@ -46,9 +46,13 @@ model Player {
   rosterSpots  RosterSpot[]
   lineupSlots  LineupSlot[]
   staffSlots   StaffSlot[]
+  battingStats SeasonBattingStat[]
+  pitchingStats SeasonPitchingStat[]
+  tradeAssets  TradeAsset[]
 
   @@index([name])
   @@index([isPitcher, salary])
+  @@index([isPitcher, careerWAR])
 }
 
 model League {
@@ -57,7 +61,7 @@ model League {
   inviteCode      String   @unique
   salaryCap       Int      @default(120000000)
   maxTeams        Int      @default(6)
-  gamesPerTeam    Int      @default(20)
+  gamesPerTeam    Int      @default(162)
   /// Dynasty era lock: pre1950 | classic | freeagent | modern | open
   era             String   @default("modern")
   status          String   @default("forming") // forming | drafting | season | complete
@@ -66,6 +70,9 @@ model League {
   createdAt       DateTime @default(now())
   teams           Team[]
   games           Game[]
+  battingStats    SeasonBattingStat[]
+  pitchingStats   SeasonPitchingStat[]
+  trades          Trade[]
 }
 
 model Team {
@@ -74,6 +81,8 @@ model Team {
   league       League       @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   ownerId      String
   owner        User         @relation(fields: [ownerId], references: [id])
+  /// CPU-controlled franchise filling an open slot
+  isCpu        Boolean      @default(false)
   name         String
   abbreviation String
   park         String       @default("Generic Park")
@@ -88,9 +97,14 @@ model Team {
   staff        StaffSlot[]
   homeGames    Game[]       @relation("HomeTeam")
   awayGames    Game[]       @relation("AwayTeam")
+  battingStats SeasonBattingStat[]
+  pitchingStats SeasonPitchingStat[]
+  tradesProposed Trade[]    @relation("TradeProposer")
+  tradesReceived Trade[]    @relation("TradePartner")
+  tradeAssets  TradeAsset[]
 
-  @@unique([leagueId, ownerId])
   @@unique([leagueId, abbreviation])
+  @@index([leagueId, ownerId])
 }
 
 model RosterSpot {
@@ -147,4 +161,85 @@ model Game {
   awayPitcher  String   @default("")
   createdAt    DateTime @default(now())
   playedAt     DateTime?
+}
+
+/// Accumulated batting counting stats for a player on a team this season
+model SeasonBattingStat {
+  id       String @id @default(cuid())
+  leagueId String
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  teamId   String
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id])
+  g        Int    @default(0)
+  ab       Int    @default(0)
+  r        Int    @default(0)
+  h        Int    @default(0)
+  rbi      Int    @default(0)
+  bb       Int    @default(0)
+  so       Int    @default(0)
+  hr       Int    @default(0)
+  sb       Int    @default(0)
+
+  @@unique([leagueId, teamId, playerId])
+  @@index([leagueId, hr])
+  @@index([leagueId, h])
+}
+
+/// Accumulated pitching counting stats for a player on a team this season
+model SeasonPitchingStat {
+  id       String @id @default(cuid())
+  leagueId String
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  teamId   String
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id])
+  g        Int    @default(0)
+  gs       Int    @default(0)
+  /// Outs recorded (IP = outs / 3)
+  outs     Int    @default(0)
+  h        Int    @default(0)
+  r        Int    @default(0)
+  er       Int    @default(0)
+  bb       Int    @default(0)
+  so       Int    @default(0)
+  hr       Int    @default(0)
+  w        Int    @default(0)
+  l        Int    @default(0)
+  sv       Int    @default(0)
+  hld      Int    @default(0)
+
+  @@unique([leagueId, teamId, playerId])
+  @@index([leagueId, so])
+  @@index([leagueId, w])
+}
+
+model Trade {
+  id             String   @id @default(cuid())
+  leagueId       String
+  league         League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  proposerTeamId String
+  proposerTeam   Team     @relation("TradeProposer", fields: [proposerTeamId], references: [id], onDelete: Cascade)
+  partnerTeamId  String
+  partnerTeam    Team     @relation("TradePartner", fields: [partnerTeamId], references: [id], onDelete: Cascade)
+  /// pending | accepted | rejected | cancelled
+  status         String   @default("pending")
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+  resolvedAt     DateTime?
+  assets         TradeAsset[]
+
+  @@index([leagueId, status])
+}
+
+model TradeAsset {
+  id         String @id @default(cuid())
+  tradeId    String
+  trade      Trade  @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  fromTeamId String
+  fromTeam   Team   @relation(fields: [fromTeamId], references: [id], onDelete: Cascade)
+  playerId   String
+  player     Player @relation(fields: [playerId], references: [id])
 }
