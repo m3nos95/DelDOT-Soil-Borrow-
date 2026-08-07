@@ -124,6 +124,7 @@ function BoxTable({
             <th className="px-1">BB</th>
             <th className="px-1">SO</th>
             <th className="px-1">HR</th>
+            <th className="px-1">SB</th>
           </tr>
         </thead>
         <tbody>
@@ -137,6 +138,7 @@ function BoxTable({
               <td className="px-1 font-mono">{b.bb}</td>
               <td className="px-1 font-mono">{b.so}</td>
               <td className="px-1 font-mono">{b.hr}</td>
+              <td className="px-1 font-mono">{b.sb ?? 0}</td>
             </tr>
           ))}
         </tbody>
@@ -155,8 +157,8 @@ function BoxTable({
           </tr>
         </thead>
         <tbody>
-          {pitchers.map((p) => (
-            <tr key={p.playerId} className="border-t border-[var(--line)]">
+          {pitchers.map((p, i) => (
+            <tr key={`${p.playerId}-${i}`} className="border-t border-[var(--line)]">
               <td className="py-1 pr-2">
                 {p.name}
                 {p.decision ? ` (${p.decision})` : ""}

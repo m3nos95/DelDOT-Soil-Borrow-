@@ -1,7 +1,7 @@
 import { customAlphabet } from "nanoid";
 import { prisma } from "./db";
-import type { SimPlayer, LineupEntry } from "./sim";
-import { simulateGame } from "./sim";
+import type { Hand, SimPlayer, LineupEntry, StaffArm, BullpenRole } from "./sim";
+import { deriveSpeed, simulateGame } from "./sim";
 
 export { PARKS } from "./constants";
 
@@ -28,11 +28,18 @@ export async function draftedPlayerIds(leagueId: string) {
   return new Set(teams.flatMap((t) => t.roster.map((r) => r.playerId)));
 }
 
+function asHand(v: string | null | undefined, fallback: Hand = "R"): Hand {
+  if (v === "L" || v === "R" || v === "S") return v;
+  return fallback;
+}
+
 function toSimPlayer(p: {
   id: string;
   name: string;
   primaryPos: string;
   isPitcher: boolean;
+  bats?: string;
+  throws?: string;
   kRate: number;
   bbRate: number;
   hbpRate: number;
@@ -42,12 +49,15 @@ function toSimPlayer(p: {
   hrRate: number;
   stuff: number;
   control: number;
+  durability?: number;
 }): SimPlayer {
   return {
     id: p.id,
     name: p.name,
     primaryPos: p.primaryPos,
     isPitcher: p.isPitcher,
+    bats: asHand(p.bats),
+    throws: asHand(p.throws),
     kRate: p.kRate,
     bbRate: p.bbRate,
     hbpRate: p.hbpRate,
@@ -57,7 +67,17 @@ function toSimPlayer(p: {
     hrRate: p.hrRate,
     stuff: p.stuff,
     control: p.control,
+    durability: p.durability ?? 50,
+    speed: deriveSpeed(p),
   };
+}
+
+function roleFromStaff(role: string): BullpenRole {
+  if (role.startsWith("SP")) return "SP";
+  if (role === "CL") return "CL";
+  if (role.startsWith("SU")) return "SU";
+  if (role === "LR") return "LR";
+  return "MU";
 }
 
 export async function ensureDefaultLineup(teamId: string) {
@@ -219,12 +239,12 @@ async function loadTeamSimParts(teamId: string, dayNumber: number) {
   const rotation = ["SP1", "SP2", "SP3", "SP4", "SP5"]
     .map((role) => staff.find((s) => s.role === role))
     .filter(Boolean);
-  const starter =
+  const starterSlot =
     rotation.length > 0
-      ? rotation[(dayNumber - 1) % rotation.length]!.player
-      : staff.find((s) => s.player.isPitcher)?.player;
+      ? rotation[(dayNumber - 1) % rotation.length]
+      : staff.find((s) => s.player.isPitcher);
 
-  if (!starter || finalLineup.length < 9) {
+  if (!starterSlot || finalLineup.length < 9) {
     throw new Error("Team is missing lineup or pitching staff");
   }
 
@@ -234,7 +254,32 @@ async function loadTeamSimParts(teamId: string, dayNumber: number) {
     position: s.position,
   }));
 
-  return { lineupEntries, pitcher: toSimPlayer(starter) };
+  const arms: StaffArm[] = [
+    { player: toSimPlayer(starterSlot.player), role: "SP" },
+  ];
+  for (const slot of staff) {
+    if (slot.playerId === starterSlot.playerId) continue;
+    const role = roleFromStaff(slot.role);
+    if (role === "SP") continue; // other starters sit this game
+    arms.push({ player: toSimPlayer(slot.player), role });
+  }
+
+  // If pen is empty, scrape remaining roster pitchers as mop-up
+  if (arms.length === 1) {
+    const roster = await prisma.rosterSpot.findMany({
+      where: { teamId },
+      include: { player: true },
+    });
+    for (const spot of roster) {
+      if (!spot.player.isPitcher) continue;
+      if (spot.playerId === starterSlot.playerId) continue;
+      if (arms.some((a) => a.player.id === spot.playerId)) continue;
+      arms.push({ player: toSimPlayer(spot.player), role: "MU" });
+      if (arms.length >= 6) break;
+    }
+  }
+
+  return { lineupEntries, staff: arms, pitcher: toSimPlayer(starterSlot.player) };
 }
 
 export async function simulateScheduledGame(gameId: string) {
@@ -251,8 +296,8 @@ export async function simulateScheduledGame(gameId: string) {
   const result = simulateGame({
     homeLineup: home.lineupEntries,
     awayLineup: away.lineupEntries,
-    homePitcher: home.pitcher,
-    awayPitcher: away.pitcher,
+    homeStaff: home.staff,
+    awayStaff: away.staff,
     seed:
       game.dayNumber * 10007 +
       game.homeTeamId.charCodeAt(0) * 97 +

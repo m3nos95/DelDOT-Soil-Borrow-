@@ -12,6 +12,7 @@
     "db:reseed": "tsx scripts/reseed-players.ts",
     "db:ingest": "python3 scripts/ingest_fangraphs_careers.py",
     "db:setup": "prisma migrate deploy && tsx prisma/seed.ts",
+    "test:sim": "tsx scripts/test-construction-sim.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

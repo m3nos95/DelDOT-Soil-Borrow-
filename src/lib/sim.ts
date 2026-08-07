@@ -1,8 +1,21 @@
+/**
+ * Construction-aware baseball sim.
+ *
+ * Wins come from roster shape, not noise alone:
+ * - L/R platoon (Randy Johnson vs lefty stacks hurts)
+ * - SP stamina → real bullpen usage (short SP without RP collapses)
+ * - Lineup sequencing (Rickey on, three Ks behind = stranded runs)
+ */
+
+export type Hand = "L" | "R" | "S";
+
 export type SimPlayer = {
   id: string;
   name: string;
   primaryPos: string;
   isPitcher: boolean;
+  bats: Hand;
+  throws: Hand;
   kRate: number;
   bbRate: number;
   hbpRate: number;
@@ -12,12 +25,22 @@ export type SimPlayer = {
   hrRate: number;
   stuff: number;
   control: number;
+  durability: number;
+  /** 0–100 speed; drives SB / GIDP avoidance */
+  speed: number;
 };
 
 export type LineupEntry = {
   player: SimPlayer;
   battingOrder: number;
   position: string;
+};
+
+export type BullpenRole = "SP" | "LR" | "SU" | "CL" | "MU";
+
+export type StaffArm = {
+  player: SimPlayer;
+  role: BullpenRole;
 };
 
 export type PlayEvent = {
@@ -38,6 +61,7 @@ export type BatterBox = {
   bb: number;
   so: number;
   hr: number;
+  sb: number;
 };
 
 export type PitcherBox = {
@@ -50,7 +74,7 @@ export type PitcherBox = {
   bb: number;
   so: number;
   hr: number;
-  decision: "" | "W" | "L";
+  decision: "" | "W" | "L" | "S" | "H";
 };
 
 export type GameResult = {
@@ -64,7 +88,19 @@ export type GameResult = {
   awayPitcher: string;
 };
 
-type BaseOccupant = { player: SimPlayer; scoredFrom?: number } | null;
+type BaseOccupant = { player: SimPlayer } | null;
+
+type Outcome = "K" | "BB" | "HBP" | "1B" | "2B" | "3B" | "HR" | "OUT" | "GIDP";
+
+type LiveArm = {
+  player: SimPlayer;
+  role: BullpenRole;
+  box: PitcherBox;
+  bf: number;
+  outsRecorded: number;
+  runsAllowed: number;
+  tired: boolean;
+};
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -80,6 +116,16 @@ function mulberry32(seed: number) {
   };
 }
 
+export function deriveSpeed(p: {
+  tripleRate: number;
+  hrRate: number;
+  isPitcher: boolean;
+}): number {
+  if (p.isPitcher) return 30;
+  // Triples proxy speed; pure mashers get dinged
+  return clamp(28 + p.tripleRate * 3.2 - p.hrRate * 0.15, 20, 96);
+}
+
 function emptyBatter(p: SimPlayer): BatterBox {
   return {
     playerId: p.id,
@@ -91,6 +137,7 @@ function emptyBatter(p: SimPlayer): BatterBox {
     bb: 0,
     so: 0,
     hr: 0,
+    sb: 0,
   };
 }
 
@@ -109,38 +156,104 @@ function emptyPitcher(p: SimPlayer): PitcherBox {
   };
 }
 
-type Outcome =
-  | "K"
-  | "BB"
-  | "HBP"
-  | "1B"
-  | "2B"
-  | "3B"
-  | "HR"
-  | "OUT";
+/** Effective batter hand vs pitcher. Switch hitters take the platoon edge. */
+export function batterHandVs(batter: SimPlayer, pitcher: SimPlayer): "L" | "R" {
+  if (batter.bats === "S") return pitcher.throws === "L" ? "R" : "L";
+  if (batter.bats === "L" || batter.bats === "R") return batter.bats;
+  return "R";
+}
+
+/**
+ * Platoon factor on offense (1 = neutral).
+ * Same-side lefty vs elite LHP is brutal — the Randy Johnson problem.
+ */
+export function platoonOffenseFactor(
+  batter: SimPlayer,
+  pitcher: SimPlayer,
+): number {
+  const hand = batterHandVs(batter, pitcher);
+  const sameSide = hand === pitcher.throws;
+  const stuff = pitcher.stuff;
+  if (!sameSide) {
+    // Opposite hand boost; bigger vs soft tossers
+    return clamp(1.06 + (55 - stuff) * 0.0015, 1.02, 1.14);
+  }
+  if (hand === "L" && pitcher.throws === "L") {
+    // Lefty-on-lefty: scales hard with stuff (Unit / Sale / Kershaw)
+    const crush = 0.78 - (stuff - 50) * 0.0045;
+    return clamp(crush, 0.55, 0.92);
+  }
+  // Righty-on-righty: milder
+  return clamp(0.9 - (stuff - 50) * 0.002, 0.78, 0.96);
+}
+
+function fatigueFactor(arm: LiveArm): number {
+  // 1 = fresh, higher = worse for pitcher (batters feast)
+  if (arm.role === "SP") {
+    const budget = 18 + (arm.player.durability / 100) * 16; // ~18–34 BF
+    const over = Math.max(0, arm.bf - budget * 0.72);
+    return 1 + over * 0.035 + (arm.tired ? 0.12 : 0);
+  }
+  // Relievers spike after short usage
+  const softCap = arm.role === "CL" ? 5 : arm.role === "SU" ? 6 : 9;
+  const over = Math.max(0, arm.bf - softCap);
+  return 1 + over * 0.06;
+}
 
 function resolvePa(
   batter: SimPlayer,
-  pitcher: SimPlayer,
+  arm: LiveArm,
+  bases: BaseOccupant[],
+  outs: number,
   rand: () => number,
 ): Outcome {
+  const pitcher = arm.player;
+  const platoon = platoonOffenseFactor(batter, pitcher);
+  const fatigue = fatigueFactor(arm);
   const stuffMod = (pitcher.stuff - 50) / 100;
   const controlMod = (pitcher.control - 50) / 100;
 
-  let k = clamp(batter.kRate * (1 + stuffMod * 0.55), 80, 420);
-  let bb = clamp(batter.bbRate * (1 - controlMod * 0.7), 30, 220);
-  let hbp = clamp(batter.hbpRate, 2, 30);
-  let single = clamp(batter.singleRate * (1 - stuffMod * 0.25), 80, 240);
-  let double = clamp(batter.doubleRate * (1 - stuffMod * 0.2), 20, 90);
-  let triple = clamp(batter.tripleRate, 1, 25);
-  let hr = clamp(batter.hrRate * (1 - stuffMod * 0.35), 5, 120);
+  // Offense scaled by platoon; pitcher fatigue makes contact/power easier
+  let k = batter.kRate * (1 + stuffMod * 0.6) * (2 - platoon) * (1.05 - (fatigue - 1) * 0.35);
+  let bb = batter.bbRate * (1 - controlMod * 0.65) * platoon * (0.95 + (fatigue - 1) * 0.4);
+  let hbp = batter.hbpRate * (1 + (fatigue - 1) * 0.2);
+  let single = batter.singleRate * (1 - stuffMod * 0.22) * platoon * fatigue;
+  let double = batter.doubleRate * (1 - stuffMod * 0.18) * platoon * fatigue;
+  let triple = batter.tripleRate * platoon;
+  let hr = batter.hrRate * (1 - stuffMod * 0.32) * platoon * (0.9 + (fatigue - 1) * 0.5);
+
+  // With RISP, contact hitters drive runs in; K machines strand them
+  const risp = Boolean(bases[1] || bases[2]);
+  if (risp) {
+    const contactSkill = clamp(1 - batter.kRate / 320, 0.2, 1);
+    k *= 1.08 - contactSkill * 0.05;
+    single *= 0.88 + contactSkill * 0.28;
+    double *= 0.9 + contactSkill * 0.25;
+    hr *= 0.92 + contactSkill * 0.2;
+  }
+
+  k = clamp(k, 60, 450);
+  bb = clamp(bb, 25, 240);
+  hbp = clamp(hbp, 1, 35);
+  single = clamp(single, 60, 260);
+  double = clamp(double, 15, 100);
+  triple = clamp(triple, 1, 30);
+  hr = clamp(hr, 3, 130);
 
   const contact = single + double + triple + hr;
   const nonOut = k + bb + hbp + contact;
-  const out = Math.max(250, 1000 - nonOut);
-  const total = k + bb + hbp + single + double + triple + hr + out;
-  const roll = rand() * total;
+  let out = Math.max(200, 1000 - nonOut);
 
+  // GIDP risk: runner on 1st, < 2 outs, slow batters
+  let gidp = 0;
+  if (bases[0] && !bases[1] && outs < 2) {
+    const slow = (100 - batter.speed) / 100;
+    gidp = clamp(18 + slow * 55 + batter.hrRate * 0.08, 10, 90);
+    out = Math.max(120, out - gidp);
+  }
+
+  const total = k + bb + hbp + single + double + triple + hr + out + gidp;
+  const roll = rand() * total;
   let acc = 0;
   const table: [Outcome, number][] = [
     ["K", k],
@@ -150,6 +263,7 @@ function resolvePa(
     ["2B", double],
     ["3B", triple],
     ["HR", hr],
+    ["GIDP", gidp],
     ["OUT", out],
   ];
   for (const [outcome, weight] of table) {
@@ -175,20 +289,102 @@ function advanceBases(
     else next[dest] = runner;
   }
 
-  if (basesToAdvance >= 4) {
-    scored.push(batter);
-  } else {
-    next[basesToAdvance - 1] = { player: batter };
-  }
+  if (basesToAdvance >= 4) scored.push(batter);
+  else next[basesToAdvance - 1] = { player: batter };
 
   return { scored, bases: next };
+}
+
+function spTargetOuts(sp: SimPlayer, rand: () => number): number {
+  // Durability 50 → ~5.5 IP, 90 → ~7.5, 30 → ~4
+  const mean = 12 + (sp.durability / 100) * 12; // outs
+  const jitter = (rand() - 0.5) * 4;
+  return clamp(Math.round(mean + jitter), 9, 27);
+}
+
+function shouldPullStarter(
+  arm: LiveArm,
+  targetOuts: number,
+  inning: number,
+  outs: number,
+  bases: BaseOccupant[],
+  scoreDiff: number, // positive if this pitcher's team is leading
+  rand: () => number,
+): boolean {
+  if (arm.outsRecorded >= targetOuts) return true;
+  if (arm.bf >= 28 + arm.player.durability / 10) return true;
+  // Traffic + fatigue in late game
+  const traffic = bases.filter(Boolean).length;
+  if (arm.outsRecorded >= targetOuts - 3 && traffic >= 2 && rand() < 0.55) {
+    return true;
+  }
+  if (inning >= 7 && arm.outsRecorded >= 15 && scoreDiff >= 0 && rand() < 0.35) {
+    return true;
+  }
+  if (arm.runsAllowed >= 6 && arm.outsRecorded >= 9) return true;
+  // High-leverage late: don't leave a gassed SP for the 9th
+  if (inning >= 8 && outs + arm.outsRecorded >= targetOuts - 1) return true;
+  return false;
+}
+
+function pickReliever(
+  pen: StaffArm[],
+  used: Set<string>,
+  inning: number,
+  scoreDiff: number, // from fielding team's POV
+  earlyExit: boolean,
+): StaffArm | null {
+  const available = pen.filter((a) => !used.has(a.player.id));
+  if (available.length === 0) return null;
+
+  const byRole = (role: BullpenRole) =>
+    available.find((a) => a.role === role) ?? null;
+
+  // Save situation
+  if (inning >= 9 && scoreDiff > 0 && scoreDiff <= 3) {
+    return byRole("CL") ?? byRole("SU") ?? available[0];
+  }
+  // Setup
+  if (inning >= 8 && scoreDiff >= 0) {
+    return byRole("SU") ?? byRole("CL") ?? byRole("LR") ?? available[0];
+  }
+  // Starter blew up early — need length
+  if (earlyExit || inning <= 6) {
+    return byRole("LR") ?? byRole("MU") ?? byRole("SU") ?? available[0];
+  }
+  return byRole("SU") ?? byRole("LR") ?? byRole("MU") ?? byRole("CL") ?? available[0];
+}
+
+function tryStolenBase(
+  bases: BaseOccupant[],
+  pitcher: SimPlayer,
+  batters: Map<string, BatterBox>,
+  rand: () => number,
+  log: (text: string) => void,
+): { bases: BaseOccupant[]; out: boolean } {
+  // Only 1st → 2nd with open second
+  if (!bases[0] || bases[1]) return { bases, out: false };
+  const runner = bases[0]!.player;
+  const chance = clamp((runner.speed - 55) / 100, 0, 0.42);
+  // Better control pitchers control the running game a bit
+  const hold = clamp((pitcher.control - 50) / 400, -0.05, 0.08);
+  if (rand() > chance - hold) return { bases, out: false };
+
+  const success = clamp(0.55 + (runner.speed - 60) * 0.006, 0.45, 0.9);
+  if (rand() < success) {
+    batters.get(runner.id)!.sb += 1;
+    log(`${runner.name} steals second.`);
+    return { bases: [null, { player: runner }, bases[2]], out: false };
+  }
+  log(`${runner.name} caught stealing.`);
+  return { bases: [null, null, bases[2]], out: true };
 }
 
 export function simulateGame(opts: {
   homeLineup: LineupEntry[];
   awayLineup: LineupEntry[];
-  homePitcher: SimPlayer;
-  awayPitcher: SimPlayer;
+  homeStaff: StaffArm[];
+  awayStaff: StaffArm[];
   seed?: number;
 }): GameResult {
   const rand = mulberry32(opts.seed ?? Date.now());
@@ -201,8 +397,20 @@ export function simulateGame(opts: {
   const homeBatters = new Map(
     opts.homeLineup.map((e) => [e.player.id, emptyBatter(e.player)]),
   );
-  const awayPitcherBox = emptyPitcher(opts.awayPitcher);
-  const homePitcherBox = emptyPitcher(opts.homePitcher);
+
+  const homePitcherBoxes: PitcherBox[] = [];
+  const awayPitcherBoxes: PitcherBox[] = [];
+
+  const homeSp =
+    opts.homeStaff.find((a) => a.role === "SP")?.player ??
+    opts.homeStaff[0]?.player;
+  const awaySp =
+    opts.awayStaff.find((a) => a.role === "SP")?.player ??
+    opts.awayStaff[0]?.player;
+  if (!homeSp || !awaySp) throw new Error("Each team needs a starting pitcher");
+
+  const homePen = opts.homeStaff.filter((a) => a.role !== "SP");
+  const awayPen = opts.awayStaff.filter((a) => a.role !== "SP");
 
   let awayScore = 0;
   let homeScore = 0;
@@ -210,58 +418,229 @@ export function simulateGame(opts: {
   let homeIdx = 0;
   let inning = 1;
 
+  // W/L tracking: pitcher of record when lead changes
+  // Use a bag so closure assignments are visible to later reads under TS CFA
+  const decision = {
+    win: null as PitcherBox | null,
+    loss: null as PitcherBox | null,
+    homeSave: null as LiveArm | null,
+    awaySave: null as LiveArm | null,
+  };
+
   const log = (half: "top" | "bottom", text: string) => {
     playByPlay.push({ inning, half, text, awayScore, homeScore });
+  };
+
+  const makeLive = (player: SimPlayer, role: BullpenRole): LiveArm => {
+    const box = emptyPitcher(player);
+    if (role === "SP" || homePitcherBoxes.length + awayPitcherBoxes.length < 20) {
+      // push later based on side
+    }
+    return { player, role, box, bf: 0, outsRecorded: 0, runsAllowed: 0, tired: false };
+  };
+
+  let homeArm = makeLive(homeSp, "SP");
+  homePitcherBoxes.push(homeArm.box);
+  let awayArm = makeLive(awaySp, "SP");
+  awayPitcherBoxes.push(awayArm.box);
+
+  const homeUsed = new Set<string>([homeSp.id]);
+  const awayUsed = new Set<string>([awaySp.id]);
+  const homeSpTarget = spTargetOuts(homeSp, rand);
+  const awaySpTarget = spTargetOuts(awaySp, rand);
+  let homeEarlyExit = false;
+  let awayEarlyExit = false;
+
+  const bringIn = (
+    side: "home" | "away",
+    half: "top" | "bottom",
+    reason: string,
+  ) => {
+    const fieldingHome = half === "top";
+    const isHomePen = side === "home";
+    const scoreDiff = isHomePen
+      ? homeScore - awayScore
+      : awayScore - homeScore;
+    const early = isHomePen ? homeEarlyExit : awayEarlyExit;
+    const pick = pickReliever(
+      isHomePen ? homePen : awayPen,
+      isHomePen ? homeUsed : awayUsed,
+      inning,
+      scoreDiff,
+      early,
+    );
+    if (!pick) {
+      // Nobody left — gassed starter/reliever stays, marked tired
+      const arm = isHomePen ? homeArm : awayArm;
+      arm.tired = true;
+      log(half, `${arm.player.name} stays on with an empty pen (${reason}).`);
+      return;
+    }
+    const live = makeLive(pick.player, pick.role);
+    if (isHomePen) {
+      homeArm = live;
+      homePitcherBoxes.push(live.box);
+      homeUsed.add(pick.player.id);
+      if (pick.role === "CL") decision.homeSave = live;
+    } else {
+      awayArm = live;
+      awayPitcherBoxes.push(live.box);
+      awayUsed.add(pick.player.id);
+      if (pick.role === "CL") decision.awaySave = live;
+    }
+    log(
+      half,
+      `${pick.player.name} enters from the pen (${pick.role}) — ${reason}.`,
+    );
+  };
+
+  const maybeHook = (
+    half: "top" | "bottom",
+    outs: number,
+    bases: BaseOccupant[],
+  ) => {
+    const fieldingHome = half === "top";
+    const arm = fieldingHome ? homeArm : awayArm;
+    if (arm.role !== "SP") {
+      // Pull tired reliever in trouble
+      if (arm.bf >= 8 || (arm.tired && bases.filter(Boolean).length >= 2)) {
+        bringIn(fieldingHome ? "home" : "away", half, "reliever spent");
+      }
+      return;
+    }
+    const target = fieldingHome ? homeSpTarget : awaySpTarget;
+    const scoreDiff = fieldingHome
+      ? homeScore - awayScore
+      : awayScore - homeScore;
+    if (
+      shouldPullStarter(arm, target, inning, outs, bases, scoreDiff, rand)
+    ) {
+      if (arm.outsRecorded <= 12) {
+        if (fieldingHome) homeEarlyExit = true;
+        else awayEarlyExit = true;
+      }
+      bringIn(
+        fieldingHome ? "home" : "away",
+        half,
+        arm.outsRecorded <= 12 ? "early exit" : "pitch count / traffic",
+      );
+    }
+  };
+
+  const noteLeadChange = (
+    fieldingHome: boolean,
+    prevHome: number,
+    prevAway: number,
+  ) => {
+    const arm = fieldingHome ? homeArm : awayArm;
+    const becameHomeLead = homeScore > awayScore && prevHome <= prevAway;
+    const becameAwayLead = awayScore > homeScore && prevAway <= prevHome;
+    if (becameHomeLead) {
+      // Away pitcher just gave up the lead
+      decision.loss = awayArm.box;
+      decision.win = homeArm.box;
+    } else if (becameAwayLead) {
+      decision.loss = homeArm.box;
+      decision.win = awayArm.box;
+    }
+    void arm;
   };
 
   const batHalf = (
     half: "top" | "bottom",
     lineup: LineupEntry[],
     batters: Map<string, BatterBox>,
-    pitcher: SimPlayer,
-    pitcherBox: PitcherBox,
     startIdx: number,
-    isHome: boolean,
   ) => {
+    const fieldingHome = half === "top";
     let outs = 0;
     let bases: BaseOccupant[] = [null, null, null];
     let runsThisHalf = 0;
     let idx = startIdx;
     let pa = 0;
 
+    // Fresh half — consider hooking starter for the 8th/9th before first pitch
+    if (inning >= 8) {
+      maybeHook(half, 0, bases);
+    }
+
     while (outs < 3 && pa < 40) {
       pa += 1;
+      let arm = fieldingHome ? homeArm : awayArm;
+
+      // Steal attempt before the PA when leadoff speed sits on 1st
+      const steal = tryStolenBase(bases, arm.player, batters, rand, (t) =>
+        log(half, t),
+      );
+      bases = steal.bases;
+      if (steal.out) {
+        outs += 1;
+        arm.outsRecorded += 1;
+        arm.box.ip += 1 / 3;
+        if (outs >= 3) break;
+      }
+
       const entry = lineup[idx % lineup.length];
       idx += 1;
       const batter = entry.player;
       const box = batters.get(batter.id)!;
-      const outcome = resolvePa(batter, pitcher, rand);
+      arm = fieldingHome ? homeArm : awayArm;
+      arm.bf += 1;
+
+      const hand = batterHandVs(batter, arm.player);
+      const platoon = platoonOffenseFactor(batter, arm.player);
+      const outcome = resolvePa(batter, arm, bases, outs, rand);
+
+      const prevHome = homeScore;
+      const prevAway = awayScore;
+
+      const creditRun = (runner: SimPlayer, rbiBatter: boolean) => {
+        runsThisHalf += 1;
+        if (fieldingHome) {
+          // home pitching, away scoring
+          awayScore += 1;
+        } else {
+          homeScore += 1;
+        }
+        batters.get(runner.id)!.r += 1;
+        if (rbiBatter) box.rbi += 1;
+        arm.box.r += 1;
+        arm.box.er += 1;
+        arm.runsAllowed += 1;
+      };
 
       if (outcome === "K") {
         outs += 1;
         box.ab += 1;
         box.so += 1;
-        pitcherBox.so += 1;
-        pitcherBox.ip += 1 / 3;
-        log(half, `${batter.name} strikes out.`);
+        arm.box.so += 1;
+        arm.box.ip += 1 / 3;
+        arm.outsRecorded += 1;
+        const tag =
+          platoon < 0.85 && hand === arm.player.throws
+            ? ` (tough ${hand}HB vs ${arm.player.throws}HP)`
+            : "";
+        log(half, `${batter.name} strikes out${tag}.`);
+      } else if (outcome === "GIDP") {
+        box.ab += 1;
+        arm.box.ip += 2 / 3;
+        arm.outsRecorded += 2;
+        const runner = bases[0]!.player;
+        bases = [null, null, bases[2]];
+        outs = Math.min(3, outs + 2);
+        log(half, `${batter.name} grounds into a double play (${runner.name} out at second).`);
       } else if (outcome === "BB" || outcome === "HBP") {
-        box.bb += outcome === "BB" ? 1 : 0;
-        pitcherBox.bb += outcome === "BB" ? 1 : 0;
+        if (outcome === "BB") {
+          box.bb += 1;
+          arm.box.bb += 1;
+        }
         const label = outcome === "BB" ? "walks" : "is hit by a pitch";
-        // Force advance only when necessary
         if (bases[0] && bases[1] && bases[2]) {
-          const scored = bases[2]!.player;
+          creditRun(bases[2]!.player, true);
           bases[2] = bases[1];
           bases[1] = bases[0];
           bases[0] = { player: batter };
-          runsThisHalf += 1;
-          if (isHome) homeScore += 1;
-          else awayScore += 1;
-          batters.get(scored.id)!.r += 1;
-          box.rbi += 1;
-          pitcherBox.r += 1;
-          pitcherBox.er += 1;
-          log(half, `${batter.name} ${label}, forcing in ${scored.name}.`);
+          log(half, `${batter.name} ${label}, forcing in a run.`);
         } else if (bases[0] && bases[1]) {
           bases[2] = bases[1];
           bases[1] = bases[0];
@@ -278,44 +657,41 @@ export function simulateGame(opts: {
       } else if (outcome === "OUT") {
         outs += 1;
         box.ab += 1;
-        pitcherBox.ip += 1 / 3;
-        const outsLeft = ["groundout", "flyout", "lineout"][Math.floor(rand() * 3)];
-        // occasional sac fly / RBI groundout with runner on third < 2 outs
-        if (bases[2] && outs < 3 && rand() < 0.28) {
-          const scored = bases[2]!.player;
+        arm.box.ip += 1 / 3;
+        arm.outsRecorded += 1;
+        const kind = ["grounds out", "flies out", "lines out"][
+          Math.floor(rand() * 3)
+        ];
+        // Sac fly / productive out with runner on 3rd < 2 outs — contact hitters better
+        const contactSkill = clamp(
+          1 - batter.kRate / 350 + batter.singleRate / 400,
+          0.15,
+          0.7,
+        );
+        if (bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25) {
+          creditRun(bases[2]!.player, true);
           bases[2] = null;
-          runsThisHalf += 1;
-          if (isHome) homeScore += 1;
-          else awayScore += 1;
-          batters.get(scored.id)!.r += 1;
-          box.rbi += 1;
-          pitcherBox.r += 1;
-          pitcherBox.er += 1;
-          log(half, `${batter.name} ${outsLeft} — ${scored.name} scores.`);
+          log(half, `${batter.name} ${kind} — run scores from third.`);
         } else {
-          log(half, `${batter.name} ${outsLeft}.`);
+          log(half, `${batter.name} ${kind}.`);
         }
       } else {
         const advance =
           outcome === "1B" ? 1 : outcome === "2B" ? 2 : outcome === "3B" ? 3 : 4;
         box.ab += 1;
         box.h += 1;
-        pitcherBox.h += 1;
+        arm.box.h += 1;
         if (outcome === "HR") {
           box.hr += 1;
-          pitcherBox.hr += 1;
+          arm.box.hr += 1;
         }
-        const { scored, bases: nextBases } = advanceBases(bases, batter, advance);
+        const { scored, bases: nextBases } = advanceBases(
+          bases,
+          batter,
+          advance,
+        );
         bases = nextBases;
-        for (const runner of scored) {
-          runsThisHalf += 1;
-          if (isHome) homeScore += 1;
-          else awayScore += 1;
-          batters.get(runner.id)!.r += 1;
-          box.rbi += 1;
-          pitcherBox.r += 1;
-          pitcherBox.er += 1;
-        }
+        for (const runner of scored) creditRun(runner, true);
         const hitName =
           outcome === "1B"
             ? "singles"
@@ -334,55 +710,64 @@ export function simulateGame(opts: {
         }
       }
 
+      noteLeadChange(fieldingHome, prevHome, prevAway);
+
+      if (outs < 3) {
+        maybeHook(half, outs, bases);
+      }
     }
 
+    // Closer save notation opportunity tracked at end
     inningScores.push(runsThisHalf);
     return idx;
   };
 
   while (inning <= 9 || awayScore === homeScore) {
-    if (inning > 18) break; // safety
+    if (inning > 18) break;
     log("top", `=== Top ${inning} ===`);
-    awayIdx = batHalf(
-      "top",
-      opts.awayLineup,
-      awayBatters,
-      opts.homePitcher,
-      homePitcherBox,
-      awayIdx,
-      false,
-    );
+    awayIdx = batHalf("top", opts.awayLineup, awayBatters, awayIdx);
     if (inning >= 9 && homeScore > awayScore) {
       inningScores.push(0);
       break;
     }
     log("bottom", `=== Bottom ${inning} ===`);
-    homeIdx = batHalf(
-      "bottom",
-      opts.homeLineup,
-      homeBatters,
-      opts.awayPitcher,
-      awayPitcherBox,
-      homeIdx,
-      true,
-    );
+    homeIdx = batHalf("bottom", opts.homeLineup, homeBatters, homeIdx);
     inning += 1;
   }
 
+  // Decisions
+  for (const b of [...homePitcherBoxes, ...awayPitcherBoxes]) {
+    if (b.decision === "W" || b.decision === "L") b.decision = "";
+  }
   if (homeScore > awayScore) {
-    homePitcherBox.decision = "W";
-    awayPitcherBox.decision = "L";
+    (decision.win ?? homePitcherBoxes[0]).decision = "W";
+    (decision.loss ?? awayPitcherBoxes[0]).decision = "L";
+    if (
+      decision.homeSave &&
+      decision.homeSave.box !== decision.win &&
+      homeScore - awayScore <= 3 &&
+      decision.homeSave.box.ip > 0
+    ) {
+      decision.homeSave.box.decision = "S";
+    }
   } else if (awayScore > homeScore) {
-    awayPitcherBox.decision = "W";
-    homePitcherBox.decision = "L";
+    (decision.win ?? awayPitcherBoxes[0]).decision = "W";
+    (decision.loss ?? homePitcherBoxes[0]).decision = "L";
+    if (
+      decision.awaySave &&
+      decision.awaySave.box !== decision.win &&
+      awayScore - homeScore <= 3 &&
+      decision.awaySave.box.ip > 0
+    ) {
+      decision.awaySave.box.decision = "S";
+    }
   }
 
-  // Round IP to thirds display-friendly
   const roundIp = (p: PitcherBox) => {
     p.ip = Math.round(p.ip * 3) / 3;
   };
-  roundIp(homePitcherBox);
-  roundIp(awayPitcherBox);
+  homePitcherBoxes.forEach(roundIp);
+  awayPitcherBoxes.forEach(roundIp);
 
   return {
     homeScore,
@@ -390,15 +775,15 @@ export function simulateGame(opts: {
     innings: inningScores,
     playByPlay,
     homeBox: {
-      batters: opts.homeLineup.map((e) => awayBatters && homeBatters.get(e.player.id)!),
-      pitchers: [homePitcherBox],
+      batters: opts.homeLineup.map((e) => homeBatters.get(e.player.id)!),
+      pitchers: homePitcherBoxes,
     },
     awayBox: {
       batters: opts.awayLineup.map((e) => awayBatters.get(e.player.id)!),
-      pitchers: [awayPitcherBox],
+      pitchers: awayPitcherBoxes,
     },
-    homePitcher: opts.homePitcher.name,
-    awayPitcher: opts.awayPitcher.name,
+    homePitcher: homeSp.name,
+    awayPitcher: awaySp.name,
   };
 }
 

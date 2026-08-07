@@ -9,6 +9,7 @@ Private historical fantasy baseball for you and your friends — inspired by Ima
 - Salary-cap draft from **every MLB career** (FanGraphs, 1871–2025)
 - **One card per player** — no Babe Ruth 1927 vs Babe Ruth 1930
 - Lineup + pitching staff management
+- Construction-aware sim: L/R platoon, SP stamina → bullpen, lineup sequencing
 - Day-by-day season simulation with box scores and play-by-play
 
 ## Quick start
