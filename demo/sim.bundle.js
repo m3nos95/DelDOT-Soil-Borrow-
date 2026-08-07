@@ -208,7 +208,7 @@ var HardballSim = (() => {
     }
     return (_l = (_k = (_j = (_i = byRole("SU")) != null ? _i : byRole("LR")) != null ? _j : byRole("MU")) != null ? _k : byRole("CL")) != null ? _l : available[0];
   }
-  function tryStolenBase(bases, pitcher, batters, rand, log) {
+  function tryStolenBase(bases, pitcher, batters, rand) {
     if (!bases[0] || bases[1]) return { bases, out: false };
     const runner = bases[0].player;
     const chance = clamp((runner.speed - 55) / 100, 0, 0.42);
@@ -217,11 +217,17 @@ var HardballSim = (() => {
     const success = clamp(0.55 + (runner.speed - 60) * 6e-3, 0.45, 0.9);
     if (rand() < success) {
       batters.get(runner.id).sb += 1;
-      log(`${runner.name} steals second.`);
-      return { bases: [null, { player: runner }, bases[2]], out: false };
+      return {
+        bases: [null, { player: runner }, bases[2]],
+        out: false,
+        text: `${runner.name} steals second.`
+      };
     }
-    log(`${runner.name} caught stealing.`);
-    return { bases: [null, null, bases[2]], out: true };
+    return {
+      bases: [null, null, bases[2]],
+      out: true,
+      text: `${runner.name} caught stealing.`
+    };
   }
   function simulateGame(opts) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
@@ -252,8 +258,25 @@ var HardballSim = (() => {
       homeSave: null,
       awaySave: null
     };
-    const log = (half, text) => {
-      playByPlay.push({ inning, half, text, awayScore, homeScore });
+    const packBases = (bases) => [
+      Boolean(bases[0]),
+      Boolean(bases[1]),
+      Boolean(bases[2])
+    ];
+    const log = (half, text, sit = {}) => {
+      var _a2, _b2, _c2;
+      const fieldingHome = half === "top";
+      const arm = fieldingHome ? homeArm : awayArm;
+      playByPlay.push({
+        inning,
+        half,
+        text,
+        awayScore,
+        homeScore,
+        outs: (_a2 = sit.outs) != null ? _a2 : 0,
+        bases: packBases((_b2 = sit.bases) != null ? _b2 : [null, null, null]),
+        pitcher: (_c2 = arm == null ? void 0 : arm.player.name) != null ? _c2 : ""
+      });
     };
     const makeLive = (player, role) => {
       const box = emptyPitcher(player);
@@ -271,7 +294,7 @@ var HardballSim = (() => {
     const awaySpTarget = spTargetOuts(awaySp, rand);
     let homeEarlyExit = false;
     let awayEarlyExit = false;
-    const bringIn = (side, half, reason) => {
+    const bringIn = (side, half, reason, sit) => {
       const fieldingHome = half === "top";
       const isHomePen = side === "home";
       const scoreDiff = isHomePen ? homeScore - awayScore : awayScore - homeScore;
@@ -286,7 +309,11 @@ var HardballSim = (() => {
       if (!pick) {
         const arm = isHomePen ? homeArm : awayArm;
         arm.tired = true;
-        log(half, `${arm.player.name} stays on with an empty pen (${reason}).`);
+        log(
+          half,
+          `${arm.player.name} stays on with an empty pen (${reason}).`,
+          sit
+        );
         return;
       }
       const live = makeLive(pick.player, pick.role);
@@ -303,15 +330,17 @@ var HardballSim = (() => {
       }
       log(
         half,
-        `${pick.player.name} enters from the pen (${pick.role}) \u2014 ${reason}.`
+        `${pick.player.name} enters from the pen (${pick.role}) \u2014 ${reason}.`,
+        sit
       );
     };
     const maybeHook = (half, outs, bases) => {
       const fieldingHome = half === "top";
       const arm = fieldingHome ? homeArm : awayArm;
+      const sit = { outs, bases };
       if (arm.role !== "SP") {
         if (arm.bf >= 8 || arm.tired && bases.filter(Boolean).length >= 2) {
-          bringIn(fieldingHome ? "home" : "away", half, "reliever spent");
+          bringIn(fieldingHome ? "home" : "away", half, "reliever spent", sit);
         }
         return;
       }
@@ -325,7 +354,8 @@ var HardballSim = (() => {
         bringIn(
           fieldingHome ? "home" : "away",
           half,
-          arm.outsRecorded <= 12 ? "early exit" : "pitch count / traffic"
+          arm.outsRecorded <= 12 ? "early exit" : "pitch count / traffic",
+          sit
         );
       }
     };
@@ -355,18 +385,15 @@ var HardballSim = (() => {
       while (outs < 3 && pa < 40) {
         pa += 1;
         let arm = fieldingHome ? homeArm : awayArm;
-        const steal = tryStolenBase(
-          bases,
-          arm.player,
-          batters,
-          rand,
-          (t) => log(half, t)
-        );
+        const steal = tryStolenBase(bases, arm.player, batters, rand);
         bases = steal.bases;
         if (steal.out) {
           outs += 1;
           arm.outsRecorded += 1;
           arm.box.ip += 1 / 3;
+        }
+        if (steal.text) {
+          log(half, steal.text, { outs, bases });
           if (outs >= 3) break;
         }
         const entry = lineup[idx % lineup.length];
@@ -401,7 +428,7 @@ var HardballSim = (() => {
           arm.box.ip += 1 / 3;
           arm.outsRecorded += 1;
           const tag = platoon < 0.85 && hand === arm.player.throws ? ` (tough ${hand}HB vs ${arm.player.throws}HP)` : "";
-          log(half, `${batter.name} strikes out${tag}.`);
+          log(half, `${batter.name} strikes out${tag}.`, { outs, bases });
         } else if (outcome === "GIDP") {
           box.ab += 1;
           arm.box.ip += 2 / 3;
@@ -409,7 +436,11 @@ var HardballSim = (() => {
           const runner = bases[0].player;
           bases = [null, null, bases[2]];
           outs = Math.min(3, outs + 2);
-          log(half, `${batter.name} grounds into a double play (${runner.name} out at second).`);
+          log(
+            half,
+            `${batter.name} grounds into a double play (${runner.name} out at second).`,
+            { outs, bases }
+          );
         } else if (outcome === "BB" || outcome === "HBP") {
           if (outcome === "BB") {
             box.bb += 1;
@@ -421,19 +452,22 @@ var HardballSim = (() => {
             bases[2] = bases[1];
             bases[1] = bases[0];
             bases[0] = { player: batter };
-            log(half, `${batter.name} ${label}, forcing in a run.`);
+            log(half, `${batter.name} ${label}, forcing in a run.`, {
+              outs,
+              bases
+            });
           } else if (bases[0] && bases[1]) {
             bases[2] = bases[1];
             bases[1] = bases[0];
             bases[0] = { player: batter };
-            log(half, `${batter.name} ${label}.`);
+            log(half, `${batter.name} ${label}.`, { outs, bases });
           } else if (bases[0]) {
             bases[1] = bases[0];
             bases[0] = { player: batter };
-            log(half, `${batter.name} ${label}.`);
+            log(half, `${batter.name} ${label}.`, { outs, bases });
           } else {
             bases[0] = { player: batter };
-            log(half, `${batter.name} ${label}.`);
+            log(half, `${batter.name} ${label}.`, { outs, bases });
           }
         } else if (outcome === "OUT") {
           outs += 1;
@@ -449,9 +483,12 @@ var HardballSim = (() => {
           if (bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25) {
             creditRun(bases[2].player, true);
             bases[2] = null;
-            log(half, `${batter.name} ${kind} \u2014 run scores from third.`);
+            log(half, `${batter.name} ${kind} \u2014 run scores from third.`, {
+              outs,
+              bases
+            });
           } else {
-            log(half, `${batter.name} ${kind}.`);
+            log(half, `${batter.name} ${kind}.`, { outs, bases });
           }
         } else {
           const advance = outcome === "1B" ? 1 : outcome === "2B" ? 2 : outcome === "3B" ? 3 : 4;
@@ -473,10 +510,11 @@ var HardballSim = (() => {
           if (scored.length) {
             log(
               half,
-              `${batter.name} ${hitName}${outcome === "HR" ? "!" : ""} \u2014 ${scored.length} run${scored.length > 1 ? "s" : ""} score.`
+              `${batter.name} ${hitName}${outcome === "HR" ? "!" : ""} \u2014 ${scored.length} run${scored.length > 1 ? "s" : ""} score.`,
+              { outs, bases }
             );
           } else {
-            log(half, `${batter.name} ${hitName}.`);
+            log(half, `${batter.name} ${hitName}.`, { outs, bases });
           }
         }
         noteLeadChange(fieldingHome, prevHome, prevAway);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { Gamecast } from "@/components/Gamecast";
 import { LeagueNav } from "@/components/LeagueNav";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -58,6 +59,15 @@ export default async function GamePage({
           <div className="scoreboard p-6">Game not simulated yet.</div>
         ) : (
           <div className="grid gap-6 lg:grid-cols-2">
+            <Gamecast
+              awayName={game.awayTeam.name}
+              homeName={game.homeTeam.name}
+              awayAbbr={game.awayTeam.abbreviation}
+              homeAbbr={game.homeTeam.abbreviation}
+              plays={plays}
+              finalAway={game.awayScore ?? 0}
+              finalHome={game.homeScore ?? 0}
+            />
             <BoxTable
               title={game.awayTeam.name}
               batters={box.away?.batters ?? []}
@@ -70,7 +80,7 @@ export default async function GamePage({
             />
             <section className="scoreboard max-h-[480px] overflow-y-auto p-6 lg:col-span-2">
               <h2 className="mb-4 font-[family-name:var(--font-display)] text-3xl tracking-wide">
-                Play by play
+                Full play by play
               </h2>
               <div className="space-y-1 font-mono text-xs sm:text-sm">
                 {plays.map((p, i) => (

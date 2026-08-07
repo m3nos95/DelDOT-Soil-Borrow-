@@ -49,6 +49,12 @@ export type PlayEvent = {
   text: string;
   awayScore: number;
   homeScore: number;
+  /** Outs after this event (0–3) */
+  outs: number;
+  /** 1B / 2B / 3B occupied after this event */
+  bases: [boolean, boolean, boolean];
+  /** Pitcher on the mound after this event */
+  pitcher: string;
 };
 
 export type BatterBox = {
@@ -360,8 +366,7 @@ function tryStolenBase(
   pitcher: SimPlayer,
   batters: Map<string, BatterBox>,
   rand: () => number,
-  log: (text: string) => void,
-): { bases: BaseOccupant[]; out: boolean } {
+): { bases: BaseOccupant[]; out: boolean; text?: string } {
   // Only 1st → 2nd with open second
   if (!bases[0] || bases[1]) return { bases, out: false };
   const runner = bases[0]!.player;
@@ -373,11 +378,17 @@ function tryStolenBase(
   const success = clamp(0.55 + (runner.speed - 60) * 0.006, 0.45, 0.9);
   if (rand() < success) {
     batters.get(runner.id)!.sb += 1;
-    log(`${runner.name} steals second.`);
-    return { bases: [null, { player: runner }, bases[2]], out: false };
+    return {
+      bases: [null, { player: runner }, bases[2]],
+      out: false,
+      text: `${runner.name} steals second.`,
+    };
   }
-  log(`${runner.name} caught stealing.`);
-  return { bases: [null, null, bases[2]], out: true };
+  return {
+    bases: [null, null, bases[2]],
+    out: true,
+    text: `${runner.name} caught stealing.`,
+  };
 }
 
 export function simulateGame(opts: {
@@ -427,8 +438,29 @@ export function simulateGame(opts: {
     awaySave: null as LiveArm | null,
   };
 
-  const log = (half: "top" | "bottom", text: string) => {
-    playByPlay.push({ inning, half, text, awayScore, homeScore });
+  const packBases = (bases: BaseOccupant[]): [boolean, boolean, boolean] => [
+    Boolean(bases[0]),
+    Boolean(bases[1]),
+    Boolean(bases[2]),
+  ];
+
+  const log = (
+    half: "top" | "bottom",
+    text: string,
+    sit: { outs?: number; bases?: BaseOccupant[] } = {},
+  ) => {
+    const fieldingHome = half === "top";
+    const arm = fieldingHome ? homeArm : awayArm;
+    playByPlay.push({
+      inning,
+      half,
+      text,
+      awayScore,
+      homeScore,
+      outs: sit.outs ?? 0,
+      bases: packBases(sit.bases ?? [null, null, null]),
+      pitcher: arm?.player.name ?? "",
+    });
   };
 
   const makeLive = (player: SimPlayer, role: BullpenRole): LiveArm => {
@@ -455,6 +487,7 @@ export function simulateGame(opts: {
     side: "home" | "away",
     half: "top" | "bottom",
     reason: string,
+    sit: { outs: number; bases: BaseOccupant[] },
   ) => {
     const fieldingHome = half === "top";
     const isHomePen = side === "home";
@@ -473,7 +506,11 @@ export function simulateGame(opts: {
       // Nobody left — gassed starter/reliever stays, marked tired
       const arm = isHomePen ? homeArm : awayArm;
       arm.tired = true;
-      log(half, `${arm.player.name} stays on with an empty pen (${reason}).`);
+      log(
+        half,
+        `${arm.player.name} stays on with an empty pen (${reason}).`,
+        sit,
+      );
       return;
     }
     const live = makeLive(pick.player, pick.role);
@@ -491,6 +528,7 @@ export function simulateGame(opts: {
     log(
       half,
       `${pick.player.name} enters from the pen (${pick.role}) — ${reason}.`,
+      sit,
     );
   };
 
@@ -501,10 +539,11 @@ export function simulateGame(opts: {
   ) => {
     const fieldingHome = half === "top";
     const arm = fieldingHome ? homeArm : awayArm;
+    const sit = { outs, bases };
     if (arm.role !== "SP") {
       // Pull tired reliever in trouble
       if (arm.bf >= 8 || (arm.tired && bases.filter(Boolean).length >= 2)) {
-        bringIn(fieldingHome ? "home" : "away", half, "reliever spent");
+        bringIn(fieldingHome ? "home" : "away", half, "reliever spent", sit);
       }
       return;
     }
@@ -523,6 +562,7 @@ export function simulateGame(opts: {
         fieldingHome ? "home" : "away",
         half,
         arm.outsRecorded <= 12 ? "early exit" : "pitch count / traffic",
+        sit,
       );
     }
   };
@@ -569,14 +609,15 @@ export function simulateGame(opts: {
       let arm = fieldingHome ? homeArm : awayArm;
 
       // Steal attempt before the PA when leadoff speed sits on 1st
-      const steal = tryStolenBase(bases, arm.player, batters, rand, (t) =>
-        log(half, t),
-      );
+      const steal = tryStolenBase(bases, arm.player, batters, rand);
       bases = steal.bases;
       if (steal.out) {
         outs += 1;
         arm.outsRecorded += 1;
         arm.box.ip += 1 / 3;
+      }
+      if (steal.text) {
+        log(half, steal.text, { outs, bases });
         if (outs >= 3) break;
       }
 
@@ -620,7 +661,7 @@ export function simulateGame(opts: {
           platoon < 0.85 && hand === arm.player.throws
             ? ` (tough ${hand}HB vs ${arm.player.throws}HP)`
             : "";
-        log(half, `${batter.name} strikes out${tag}.`);
+        log(half, `${batter.name} strikes out${tag}.`, { outs, bases });
       } else if (outcome === "GIDP") {
         box.ab += 1;
         arm.box.ip += 2 / 3;
@@ -628,7 +669,11 @@ export function simulateGame(opts: {
         const runner = bases[0]!.player;
         bases = [null, null, bases[2]];
         outs = Math.min(3, outs + 2);
-        log(half, `${batter.name} grounds into a double play (${runner.name} out at second).`);
+        log(
+          half,
+          `${batter.name} grounds into a double play (${runner.name} out at second).`,
+          { outs, bases },
+        );
       } else if (outcome === "BB" || outcome === "HBP") {
         if (outcome === "BB") {
           box.bb += 1;
@@ -640,19 +685,22 @@ export function simulateGame(opts: {
           bases[2] = bases[1];
           bases[1] = bases[0];
           bases[0] = { player: batter };
-          log(half, `${batter.name} ${label}, forcing in a run.`);
+          log(half, `${batter.name} ${label}, forcing in a run.`, {
+            outs,
+            bases,
+          });
         } else if (bases[0] && bases[1]) {
           bases[2] = bases[1];
           bases[1] = bases[0];
           bases[0] = { player: batter };
-          log(half, `${batter.name} ${label}.`);
+          log(half, `${batter.name} ${label}.`, { outs, bases });
         } else if (bases[0]) {
           bases[1] = bases[0];
           bases[0] = { player: batter };
-          log(half, `${batter.name} ${label}.`);
+          log(half, `${batter.name} ${label}.`, { outs, bases });
         } else {
           bases[0] = { player: batter };
-          log(half, `${batter.name} ${label}.`);
+          log(half, `${batter.name} ${label}.`, { outs, bases });
         }
       } else if (outcome === "OUT") {
         outs += 1;
@@ -671,9 +719,12 @@ export function simulateGame(opts: {
         if (bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25) {
           creditRun(bases[2]!.player, true);
           bases[2] = null;
-          log(half, `${batter.name} ${kind} — run scores from third.`);
+          log(half, `${batter.name} ${kind} — run scores from third.`, {
+            outs,
+            bases,
+          });
         } else {
-          log(half, `${batter.name} ${kind}.`);
+          log(half, `${batter.name} ${kind}.`, { outs, bases });
         }
       } else {
         const advance =
@@ -704,9 +755,10 @@ export function simulateGame(opts: {
           log(
             half,
             `${batter.name} ${hitName}${outcome === "HR" ? "!" : ""} — ${scored.length} run${scored.length > 1 ? "s" : ""} score.`,
+            { outs, bases },
           );
         } else {
-          log(half, `${batter.name} ${hitName}.`);
+          log(half, `${batter.name} ${hitName}.`, { outs, bases });
         }
       }
 

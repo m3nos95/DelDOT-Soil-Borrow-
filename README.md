@@ -22,6 +22,8 @@ npm run demo
 
 Open [http://localhost:4173](http://localhost:4173). Or open `demo/index.html` directly (keep the three files in `demo/` together).
 
+Hit **Watch game** for a Gamecast-style diamond replay (bases, outs, score, play feed — pause / step / speed). Not pitch-by-pitch yet; each PA and baserunning event animates.
+
 Rebuild assets after sim changes: `npm run demo:build`.
 
 This uses a ~75-player star subset. The full app below loads every career card for drafts with friends.
