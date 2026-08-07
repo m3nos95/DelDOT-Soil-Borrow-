@@ -27,6 +27,11 @@ const LINKS = [
     label: "Stats",
     statuses: ["season", "complete"],
   },
+  {
+    href: "/awards",
+    label: "Awards",
+    statuses: ["season", "complete"],
+  },
 ] as const;
 
 export function LeagueNav({

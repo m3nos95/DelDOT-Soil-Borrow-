@@ -193,8 +193,23 @@ export default async function LeaguePage({
                   Day {nextDay?.dayNumber ?? "—"} next · {remaining} games left
                 </p>
               ) : (
-                <p className="mb-4 text-sm text-[var(--foul)]">Season complete.</p>
+                <p className="mb-4 text-sm text-[var(--foul)]">
+                  Season complete.{" "}
+                  <Link href={`/league/${id}/awards`} className="underline">
+                    View awards
+                  </Link>
+                </p>
               )}
+              {league.status === "season" ? (
+                <p className="mb-4 text-sm text-[var(--fog)]">
+                  <Link
+                    href={`/league/${id}/awards`}
+                    className="text-[var(--foul)] hover:underline"
+                  >
+                    Award race →
+                  </Link>
+                </p>
+              ) : null}
               <div>
                 {league.games.length === 0 ? (
                   <p className="text-sm text-[var(--fog)]">

@@ -50,6 +50,7 @@ model Player {
   staffSlots   StaffSlot[]
   battingStats SeasonBattingStat[]
   pitchingStats SeasonPitchingStat[]
+  awards       SeasonAward[]
   tradeAssets  TradeAsset[]
 
   @@index([name])
@@ -74,6 +75,7 @@ model League {
   games           Game[]
   battingStats    SeasonBattingStat[]
   pitchingStats   SeasonPitchingStat[]
+  awards          SeasonAward[]
   trades          Trade[]
 }
 
@@ -101,6 +103,7 @@ model Team {
   awayGames    Game[]       @relation("AwayTeam")
   battingStats SeasonBattingStat[]
   pitchingStats SeasonPitchingStat[]
+  awards       SeasonAward[]
   tradesProposed Trade[]    @relation("TradeProposer")
   tradesReceived Trade[]    @relation("TradePartner")
   tradeAssets  TradeAsset[]
@@ -216,6 +219,31 @@ model SeasonPitchingStat {
   @@unique([leagueId, teamId, playerId])
   @@index([leagueId, so])
   @@index([leagueId, w])
+}
+
+/// End-of-season (or live race) hardware: MVP, Cy Young, Gold Glove, Silver Slugger
+model SeasonAward {
+  id       String   @id @default(cuid())
+  leagueId String
+  league   League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  /// mvp | cy_young | gold_glove | silver_slugger
+  award    String
+  /// Position for GG / SS (C, 1B, …); empty for MVP / Cy Young
+  position String   @default("")
+  /// AL | NL | LEAGUE
+  circuit  String   @default("LEAGUE")
+  playerId String
+  player   Player   @relation(fields: [playerId], references: [id])
+  teamId   String
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  score    Float    @default(0)
+  note     String   @default("")
+  /// true once the schedule is finished
+  finalized Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([leagueId, award, position, circuit])
+  @@index([leagueId, award])
 }
 
 model Trade {

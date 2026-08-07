@@ -17,6 +17,7 @@
     "test:gm": "tsx scripts/test-gm.ts",
     "test:cpu": "tsx scripts/test-cpu-season.ts",
     "test:defense": "tsx scripts/test-defense-gg.ts",
+    "test:awards": "tsx scripts/test-awards.ts",
     "gg:fetch": "python3 scripts/fetch_gold_gloves.py",
     "gg:apply": "python3 scripts/apply_gold_gloves.py && tsx scripts/sync_gold_gloves_db.ts",
     "demo:build": "node scripts/build-demo.mjs",

@@ -382,6 +382,8 @@ export async function simulateScheduledGame(gameId: string) {
       where: { id: game.leagueId },
       data: { status: "complete" },
     });
+    const { computeAndSaveAwards } = await import("./awards");
+    await computeAndSaveAwards(game.leagueId, { finalized: true });
   }
 
   return prisma.game.findUnique({ where: { id: gameId } });

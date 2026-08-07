@@ -627,6 +627,85 @@ select.field-input option {
   font-variant-numeric: tabular-nums;
 }
 
+/* Awards */
+.award-card {
+  border-top: 1px solid rgba(232, 184, 74, 0.28);
+  padding: 1.35rem 0 0.5rem;
+  background:
+    linear-gradient(165deg, rgba(232, 184, 74, 0.06), transparent 55%);
+}
+.award-kind {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--foul);
+}
+.award-name {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+.award-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 0 0 0.55rem;
+  color: var(--fog);
+  font-size: 0.95rem;
+}
+.award-note {
+  margin: 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: rgba(243, 239, 228, 0.78);
+}
+.award-empty {
+  margin: 0.5rem 0 0;
+  color: var(--fog);
+}
+.award-pos-grid {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 720px) {
+  .award-pos-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.award-pos {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.15rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.award-pos-label {
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--foul);
+}
+.award-pos-name {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+}
+.award-pos-note {
+  grid-column: 2;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--fog);
+}
+
 /* Empty state */
 .empty-diamond {
   border-top: 1px solid var(--line);
