@@ -32,9 +32,11 @@
       font-family: "Source Serif 4", Georgia, serif;
       color: var(--chalk);
       background:
-        radial-gradient(ellipse 90% 55% at 50% -10%, rgba(232, 168, 56, 0.12), transparent 55%),
-        radial-gradient(ellipse 70% 50% at 80% 100%, rgba(26, 58, 46, 0.55), transparent 50%),
-        linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #0d1814);
+        radial-gradient(ellipse 100% 58% at 55% -12%, rgba(232, 184, 74, 0.14), transparent 56%),
+        radial-gradient(ellipse 55% 40% at 92% 8%, rgba(70, 120, 180, 0.12), transparent 52%),
+        radial-gradient(ellipse 70% 48% at 0% 22%, rgba(22, 70, 44, 0.55), transparent 52%),
+        radial-gradient(ellipse 60% 42% at 100% 85%, rgba(184, 90, 40, 0.1), transparent 48%),
+        linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #0a1410);
       min-height: 100vh;
     }
 
@@ -419,13 +421,41 @@
       margin: 0 auto 0.75rem;
       aspect-ratio: 1;
       border: 3px solid #2a2010;
-      background: var(--bit-sky);
+      background: #101828;
       overflow: hidden;
+      box-shadow: inset 0 0 36px rgba(0, 0, 0, 0.45);
     }
     .cast.bit64 .field-wrap {
       border-radius: 8px;
       border-color: rgba(255, 255, 255, 0.12);
-      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
+      box-shadow:
+        inset 0 0 48px rgba(0, 0, 0, 0.4),
+        0 0 28px rgba(30, 80, 50, 0.2);
+    }
+    .field-bg-16 { display: block; }
+    .field-bg-64 { display: none; }
+    .cast.bit64 .field-bg-16 { display: none; }
+    .cast.bit64 .field-bg-64 { display: block; }
+    .fielder-16 { display: block; opacity: 0.85; }
+    .fielder-64 { display: none; opacity: 0.7; }
+    .cast.bit64 .fielder-16 { display: none; }
+    .cast.bit64 .fielder-64 { display: block; }
+    .runner > rect { display: block; }
+    .runner .r64 { display: none; }
+    .cast.bit64 .runner > rect { display: none; }
+    .cast.bit64 .runner .r64 { display: block; }
+    .cast.bit64 .base.on { filter: url(#baseGlow); }
+    .cast.gc-big .cart {
+      box-shadow:
+        0 0 0 3px #5a4010,
+        0 12px 0 #0a0c10,
+        0 0 64px rgba(255, 224, 102, 0.35);
+    }
+    .cast.bit64.gc-big .cart {
+      box-shadow:
+        0 0 0 1px rgba(255, 230, 140, 0.55),
+        0 22px 56px rgba(0, 0, 0, 0.45),
+        0 0 72px rgba(255, 224, 102, 0.28);
     }
     .field {
       width: 100%;
@@ -628,10 +658,10 @@
       <div class="rosters" id="rosters"></div>
     </div>
 
-    <div class="cast bit16" id="cast">
+    <div class="cast bit64" id="cast">
       <div class="bit-toggle" role="group" aria-label="Graphics mode">
-        <button type="button" class="on" id="bit16Btn" data-mode="bit16">16-bit</button>
-        <button type="button" id="bit64Btn" data-mode="bit64">64-bit</button>
+        <button type="button" id="bit16Btn" data-mode="bit16">16-bit</button>
+        <button type="button" class="on" id="bit64Btn" data-mode="bit64">64-bit</button>
       </div>
       <div class="cart">
         <div class="hud">
@@ -655,58 +685,158 @@
           <div class="ball-flash" id="ballFlash"></div>
           <svg class="field" viewBox="0 0 400 400" role="img" aria-label="Diamond">
             <defs>
-              <pattern id="grass16" width="16" height="16" patternUnits="userSpaceOnUse">
-                <rect width="16" height="16" fill="#1f6b3a" />
-                <rect width="8" height="8" fill="#175530" />
-                <rect x="8" y="8" width="8" height="8" fill="#175530" />
-                <rect x="4" y="2" width="2" height="2" fill="#248044" />
-                <rect x="12" y="10" width="2" height="2" fill="#248044" />
+              <pattern id="grass16" width="12" height="12" patternUnits="userSpaceOnUse">
+                <rect width="12" height="12" fill="#1a6b38" />
+                <rect width="6" height="6" fill="#145530" />
+                <rect x="6" y="6" width="6" height="6" fill="#145530" />
+                <rect x="2" y="1" width="2" height="2" fill="#248844" />
+                <rect x="8" y="7" width="2" height="2" fill="#2a9050" />
+                <rect x="5" y="9" width="1" height="1" fill="#0e4024" />
               </pattern>
-              <radialGradient id="dirt64" cx="50%" cy="50%" r="60%">
-                <stop offset="0%" stop-color="#d4a85a" />
-                <stop offset="100%" stop-color="#8a6a2e" />
+              <pattern id="wall16" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="#4a3020" />
+                <rect width="8" height="2" fill="#3a2414" />
+                <rect y="4" width="8" height="1" fill="#2a180c" />
+              </pattern>
+              <radialGradient id="sky64" cx="50%" cy="30%" r="75%">
+                <stop offset="0%" stop-color="#1a3048" />
+                <stop offset="55%" stop-color="#0e1a2c" />
+                <stop offset="100%" stop-color="#060c14" />
               </radialGradient>
-              <linearGradient id="sky64" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#1a3a5c" />
-                <stop offset="100%" stop-color="#0e2438" />
+              <linearGradient id="grass64" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#1a6b3a" />
+                <stop offset="45%" stop-color="#145530" />
+                <stop offset="100%" stop-color="#0e4024" />
               </linearGradient>
+              <pattern id="mow64" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="28" height="28" fill="transparent" />
+                <rect width="14" height="28" fill="rgba(0,0,0,0.12)" />
+              </pattern>
+              <radialGradient id="dirt64" cx="45%" cy="40%" r="65%">
+                <stop offset="0%" stop-color="#e0b868" />
+                <stop offset="55%" stop-color="#c49a4a" />
+                <stop offset="100%" stop-color="#7a5828" />
+              </radialGradient>
+              <linearGradient id="wall64" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#5a4028" />
+                <stop offset="100%" stop-color="#2a1c10" />
+              </linearGradient>
+              <filter id="baseGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="3" result="b" />
+                <feMerge>
+                  <feMergeNode in="b" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
             </defs>
-            <!-- outfield grass -->
-            <polygon points="200,20 380,200 200,380 20,200" fill="url(#grass16)" />
-            <!-- warning track / wall -->
-            <polygon class="wall" points="200,8 392,200 200,392 8,200" fill="none" stroke="#3a2a18" stroke-width="14" />
-            <polygon class="wall-top" points="200,14 386,200 200,386 14,200" fill="none" stroke="#5a4020" stroke-width="4" />
-            <!-- foul territory corners -->
-            <polygon points="0,400 120,400 200,320 80,400" fill="#0e1c14" />
-            <polygon points="280,400 400,400 320,400 200,320" fill="#0e1c14" />
-            <line class="foul-line" x1="200" y1="328" x2="48" y2="100" />
-            <line class="foul-line" x1="200" y1="328" x2="352" y2="100" />
-            <polygon class="infield-dirt" points="200,108 292,200 200,292 108,200" />
-            <circle class="mound" cx="200" cy="200" r="16" />
-            <circle cx="200" cy="200" r="4" fill="#f2eee0" />
+
+            <!-- 16-bit diamond -->
+            <g class="field-bg-16">
+              <rect width="400" height="400" fill="#101828" />
+              <g fill="#1a2840">
+                <rect x="40" y="10" width="2" height="2" opacity="0.5" />
+                <rect x="120" y="18" width="2" height="2" opacity="0.45" />
+                <rect x="210" y="8" width="2" height="2" opacity="0.55" />
+                <rect x="300" y="22" width="2" height="2" opacity="0.4" />
+                <rect x="360" y="14" width="2" height="2" opacity="0.5" />
+              </g>
+              <polygon points="200,10 390,200 200,390 10,200" fill="url(#wall16)" />
+              <polygon points="200,22 378,200 200,378 22,200" fill="url(#grass16)" />
+              <polygon points="200,16 384,200 200,384 16,200" fill="none" stroke="#6a4820" stroke-width="4" />
+              <polygon points="200,36 362,200 200,364 38,200" fill="none" stroke="#c48838" stroke-width="5" />
+              <line class="foul-line" x1="200" y1="328" x2="48" y2="100" />
+              <line class="foul-line" x1="200" y1="328" x2="352" y2="100" />
+              <polygon class="infield-dirt" points="200,108 292,200 200,292 108,200" />
+              <rect x="188" y="160" width="8" height="8" fill="#d4a85a" opacity="0.45" />
+              <rect x="220" y="200" width="8" height="8" fill="#d4a85a" opacity="0.35" />
+              <rect x="172" y="210" width="8" height="8" fill="#a87830" opacity="0.4" />
+              <circle class="mound" cx="200" cy="200" r="16" />
+              <circle cx="200" cy="200" r="5" fill="#f2eee0" />
+            </g>
+
+            <!-- 64-bit diamond -->
+            <g class="field-bg-64">
+              <rect width="400" height="400" fill="url(#sky64)" />
+              <ellipse cx="200" cy="260" rx="180" ry="140" fill="rgba(255,220,120,0.08)" />
+              <polygon points="200,28 372,200 200,372 28,200" fill="url(#grass64)" />
+              <polygon points="200,28 372,200 200,372 28,200" fill="url(#mow64)" />
+              <polygon points="200,40 360,200 200,360 40,200" fill="none" stroke="#b88848" stroke-width="7" opacity="0.7" />
+              <polygon points="200,18 382,200 200,382 18,200" fill="none" stroke="url(#wall64)" stroke-width="11" />
+              <line x1="200" y1="330" x2="52" y2="105" stroke="rgba(245,240,225,0.85)" stroke-width="2.5" stroke-linecap="round" />
+              <line x1="200" y1="330" x2="348" y2="105" stroke="rgba(245,240,225,0.85)" stroke-width="2.5" stroke-linecap="round" />
+              <polygon points="200,105 295,200 200,295 105,200" fill="url(#dirt64)" />
+              <ellipse cx="200" cy="200" rx="88" ry="88" fill="none" stroke="rgba(40,70,40,0.25)" stroke-width="14" />
+              <ellipse cx="200" cy="200" rx="20" ry="14" fill="#8a6a2e" />
+              <ellipse cx="200" cy="198" rx="7" ry="4" fill="#f2eee0" opacity="0.85" />
+            </g>
+
+            <!-- Fielders -->
+            <g class="fielder-16" transform="translate(194,70)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(310,192)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(74,192)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(120,120)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(260,120)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(86,86)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(290,86)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(194,48)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+
+            <g class="fielder-64" transform="translate(200,78)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(318,200)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(82,200)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(130,130)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(270,130)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(95,95)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(305,95)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(200,55)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+
             <!-- bases -->
-            <polygon class="base" id="base2" points="200,100 220,120 200,140 180,120" />
-            <polygon class="base" id="base3" points="100,200 120,180 140,200 120,220" />
-            <polygon class="base" id="base1" points="300,200 320,180 340,200 320,220" />
-            <polygon class="home-plate" points="200,332 218,314 218,300 182,300 182,314" />
-            <!-- pixel runners -->
-            <g id="runner2" class="runner" transform="translate(192,92)">
-              <rect x="4" y="0" width="8" height="6" fill="#f0c8a0" />
-              <rect x="2" y="6" width="12" height="10" fill="#c43c2a" />
-              <rect x="2" y="16" width="5" height="6" fill="#1a2040" />
-              <rect x="9" y="16" width="5" height="6" fill="#1a2040" />
+            <polygon class="base" id="base1" points="318,183 335,200 318,217 301,200" />
+            <polygon class="base" id="base2" points="200,98 217,115 200,132 183,115" />
+            <polygon class="base" id="base3" points="82,183 99,200 82,217 65,200" />
+            <polygon class="home-plate" points="200,336 220,316 220,300 180,300 180,316" />
+
+            <!-- runners: pixel + smooth variants -->
+            <g id="runner1" class="runner" transform="translate(300,188)">
+              <rect x="5" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="3" y="6" width="12" height="11" fill="#e8a838" />
+              <rect x="4" y="8" width="3" height="3" fill="rgba(255,255,255,0.25)" />
+              <rect x="3" y="17" width="5" height="7" fill="#1a2040" />
+              <rect x="10" y="17" width="5" height="7" fill="#1a2040" />
+              <g class="r64">
+                <ellipse cx="9" cy="22" rx="7" ry="2.5" fill="rgba(0,0,0,0.35)" />
+                <circle cx="9" cy="5" r="4.5" fill="#e8c4a0" />
+                <rect x="4" y="9" width="10" height="11" rx="2" fill="#e8a838" />
+                <rect x="3" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+                <rect x="10.5" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+              </g>
             </g>
-            <g id="runner3" class="runner" transform="translate(92,192)">
-              <rect x="4" y="0" width="8" height="6" fill="#f0c8a0" />
-              <rect x="2" y="6" width="12" height="10" fill="#2a6ac4" />
-              <rect x="2" y="16" width="5" height="6" fill="#1a2040" />
-              <rect x="9" y="16" width="5" height="6" fill="#1a2040" />
+            <g id="runner2" class="runner" transform="translate(188,95)">
+              <rect x="5" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="3" y="6" width="12" height="11" fill="#c43c2a" />
+              <rect x="4" y="8" width="3" height="3" fill="rgba(255,255,255,0.25)" />
+              <rect x="3" y="17" width="5" height="7" fill="#1a2040" />
+              <rect x="10" y="17" width="5" height="7" fill="#1a2040" />
+              <g class="r64">
+                <ellipse cx="9" cy="22" rx="7" ry="2.5" fill="rgba(0,0,0,0.35)" />
+                <circle cx="9" cy="5" r="4.5" fill="#e8c4a0" />
+                <rect x="4" y="9" width="10" height="11" rx="2" fill="#d44a3a" />
+                <rect x="3" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+                <rect x="10.5" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+              </g>
             </g>
-            <g id="runner1" class="runner" transform="translate(292,192)">
-              <rect x="4" y="0" width="8" height="6" fill="#f0c8a0" />
-              <rect x="2" y="6" width="12" height="10" fill="#e8a838" />
-              <rect x="2" y="16" width="5" height="6" fill="#1a2040" />
-              <rect x="9" y="16" width="5" height="6" fill="#1a2040" />
+            <g id="runner3" class="runner" transform="translate(70,188)">
+              <rect x="5" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="3" y="6" width="12" height="11" fill="#2a6ac4" />
+              <rect x="4" y="8" width="3" height="3" fill="rgba(255,255,255,0.25)" />
+              <rect x="3" y="17" width="5" height="7" fill="#1a2040" />
+              <rect x="10" y="17" width="5" height="7" fill="#1a2040" />
+              <g class="r64">
+                <ellipse cx="9" cy="22" rx="7" ry="2.5" fill="rgba(0,0,0,0.35)" />
+                <circle cx="9" cy="5" r="4.5" fill="#e8c4a0" />
+                <rect x="4" y="9" width="10" height="11" rx="2" fill="#3a7ad4" />
+                <rect x="3" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+                <rect x="10.5" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+              </g>
             </g>
           </svg>
         </div>

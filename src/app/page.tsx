@@ -16,7 +16,7 @@ export default async function HomePage() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "linear-gradient(180deg, rgba(5,13,10,0.25) 0%, rgba(5,13,10,0.08) 38%, rgba(5,13,10,0.62) 72%, rgba(5,13,10,0.96) 100%)",
+            "radial-gradient(ellipse 70% 45% at 50% 70%, rgba(232,184,74,0.08), transparent 60%), linear-gradient(180deg, rgba(5,13,10,0.2) 0%, rgba(5,13,10,0.05) 36%, rgba(5,13,10,0.55) 70%, rgba(5,13,10,0.97) 100%)",
         }}
       />
 
