@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { PARKS } from "@/lib/constants";
+import { getFranchise } from "@/lib/franchises";
 import {
   draftedPlayerIds,
   generateInviteCode,
@@ -22,26 +22,27 @@ async function mustUser() {
   return user;
 }
 
+function resolveFranchise(formData: FormData) {
+  const raw = String(formData.get("franchiseCode") ?? "").trim().toUpperCase();
+  const franchise = getFranchise(raw);
+  if (!franchise) return { error: "Pick a city slot (ARI, BOS, LANL…)" as const };
+  return { franchise };
+}
+
 export async function createLeagueAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const user = await mustUser();
   const name = String(formData.get("name") ?? "").trim();
-  const teamName = String(formData.get("teamName") ?? "").trim();
-  const abbreviation = String(formData.get("abbreviation") ?? "")
-    .trim()
-    .toUpperCase();
-  const park = String(formData.get("park") ?? PARKS[0]);
   const maxTeams = Number(formData.get("maxTeams") ?? 6);
   const gamesPerTeam = Number(formData.get("gamesPerTeam") ?? 20);
+  const picked = resolveFranchise(formData);
+  if ("error" in picked) return { error: picked.error };
+  const { franchise } = picked;
 
   if (name.length < 3) return { error: "League name is too short" };
-  if (teamName.length < 2) return { error: "Team name is too short" };
-  if (!/^[A-Z]{2,4}$/.test(abbreviation)) {
-    return { error: "Abbreviation must be 2–4 letters" };
-  }
-  if (maxTeams < 2 || maxTeams > 8) return { error: "Teams must be 2–8" };
+  if (maxTeams < 2 || maxTeams > 30) return { error: "Teams must be 2–30" };
 
   let inviteCode = generateInviteCode();
   for (let i = 0; i < 5; i++) {
@@ -62,11 +63,9 @@ export async function createLeagueAction(
       teams: {
         create: {
           ownerId: user.id,
-          name: teamName,
-          abbreviation,
-          park: PARKS.includes(park as (typeof PARKS)[number])
-            ? park
-            : PARKS[0],
+          name: franchise.name,
+          abbreviation: franchise.code,
+          park: franchise.park,
         },
       },
     },
@@ -84,17 +83,11 @@ export async function joinLeagueAction(
     .trim()
     .replace(/\s+/g, "")
     .toUpperCase();
-  const teamName = String(formData.get("teamName") ?? "").trim();
-  const abbreviation = String(formData.get("abbreviation") ?? "")
-    .trim()
-    .toUpperCase();
-  const park = String(formData.get("park") ?? PARKS[0]);
+  const picked = resolveFranchise(formData);
+  if ("error" in picked) return { error: picked.error };
+  const { franchise } = picked;
 
   if (!code) return { error: "Enter an invite code" };
-  if (teamName.length < 2) return { error: "Team name is too short" };
-  if (!/^[A-Z]{2,4}$/.test(abbreviation)) {
-    return { error: "Abbreviation must be 2–4 letters" };
-  }
 
   const league = await prisma.league.findUnique({
     where: { inviteCode: code },
@@ -110,17 +103,17 @@ export async function joinLeagueAction(
   if (league.teams.length >= league.maxTeams) {
     return { error: "League is full" };
   }
-  if (league.teams.some((t) => t.abbreviation === abbreviation)) {
-    return { error: "Abbreviation already taken in this league" };
+  if (league.teams.some((t) => t.abbreviation === franchise.code)) {
+    return { error: `${franchise.code} is already taken in this league` };
   }
 
   await prisma.team.create({
     data: {
       leagueId: league.id,
       ownerId: user.id,
-      name: teamName,
-      abbreviation,
-      park: PARKS.includes(park as (typeof PARKS)[number]) ? park : PARKS[0],
+      name: franchise.name,
+      abbreviation: franchise.code,
+      park: franchise.park,
     },
   });
 

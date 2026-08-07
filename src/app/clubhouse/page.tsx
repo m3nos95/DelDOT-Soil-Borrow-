@@ -25,8 +25,8 @@ export default async function ClubhousePage() {
             Clubhouse
           </h1>
           <p className="mt-2 max-w-xl text-[var(--fog)]">
-            Create a private league and share the invite code, or join one your
-            friends already started.
+            Create a private league, claim a city slot (BOS, LANL, NYAL…), and
+            share the invite code. City codes only — no nicknames or logos.
           </p>
         </div>
 
