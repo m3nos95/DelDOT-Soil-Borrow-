@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { GameField } from "@/components/GameField";
 import { StrikeZone } from "@/components/StrikeZone";
 import type { PlayEvent } from "@/lib/sim";
@@ -33,6 +34,65 @@ function isBigPlay(text: string) {
 
 function hasPitches(ev: PlayEvent | null | undefined) {
   return !!ev?.pitches && ev.pitches.length > 0;
+}
+
+const clampN = (n: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, n));
+
+/** Runs per inning for each side, derived live from the play feed. */
+function computeLineScore(plays: PlayEvent[], upto: number) {
+  const away: number[] = [];
+  const home: number[] = [];
+  let prevA = 0;
+  let prevH = 0;
+  for (let i = 0; i <= upto && i < plays.length; i++) {
+    const ev = plays[i];
+    const inn = ev.inning - 1;
+    if (inn < 0) continue;
+    const dA = ev.awayScore - prevA;
+    const dH = ev.homeScore - prevH;
+    if (dA > 0) away[inn] = (away[inn] ?? 0) + dA;
+    if (dH > 0) home[inn] = (home[inn] ?? 0) + dH;
+    // ensure the bucket exists once an inning is reached
+    if (away[inn] === undefined) away[inn] = away[inn] ?? 0;
+    prevA = ev.awayScore;
+    prevH = ev.homeScore;
+  }
+  const innings = Math.max(away.length, home.length, 9);
+  for (let i = 0; i < innings; i++) {
+    if (away[i] === undefined) away[i] = i < (plays[upto]?.inning ?? 0) ? 0 : -1;
+    if (home[i] === undefined) home[i] = i < (plays[upto]?.inning ?? 0) ? 0 : -1;
+  }
+  return { away, home, innings };
+}
+
+/** Lightweight home-team win probability from score, inning, half. */
+function winProbHome(
+  homeScore: number,
+  awayScore: number,
+  inning: number,
+  half: "top" | "bottom",
+): number {
+  const diff = homeScore - awayScore;
+  const inningsLeft = Math.max(0, 9 - inning) + (half === "top" ? 0.5 : 0);
+  const spread = Math.max(0.7, Math.sqrt(inningsLeft + 0.5));
+  const k = 1.15;
+  let wp = 1 / (1 + Math.exp((-diff * k) / spread));
+  if (diff === 0) wp = 0.5 + (half === "bottom" ? 0.03 : 0);
+  return clampN(wp, 0.02, 0.98);
+}
+
+function battedTarget(text: string, idx: number): { x: number; y: number } | null {
+  const side = idx % 2 === 0 ? 1 : -1;
+  if (/homers/.test(text)) return { x: 50 + side * 6, y: 8 };
+  if (/triples/.test(text)) return { x: 50 + side * 30, y: 20 };
+  if (/doubles/.test(text)) return { x: 50 + side * 26, y: 26 };
+  if (/flies out|sacrifice|scores from third/.test(text))
+    return { x: 50 + side * 20, y: 24 };
+  if (/lines|singles/.test(text)) return { x: 50 + side * 22, y: 42 };
+  if (/grounds|double play|reaches on an error/.test(text))
+    return { x: 50 + side * 16, y: 58 };
+  return null;
 }
 
 export function Gamecast({
@@ -168,6 +228,21 @@ export function Gamecast({
     ? `${cur?.batter ?? "Batter"} at the plate`
     : (cur?.text ?? "Play ball…");
 
+  // Line score + win probability (live from the feed)
+  const line = computeLineScore(plays, Math.max(0, idx));
+  const wpInning = cur?.inning ?? 1;
+  const wpHalf = cur?.half ?? "top";
+  const wpHome = winProbHome(
+    cur?.homeScore ?? 0,
+    cur?.awayScore ?? 0,
+    wpInning,
+    wpHalf,
+  );
+  const wpHomePct = Math.round(wpHome * 100);
+
+  // Ball-in-play flight overlay (only on the result reveal of a batted ball)
+  const batted = showResult && cur ? battedTarget(cur.text, idx) : null;
+
   const chooseBit = (mode: BitMode) => {
     setBit(mode);
     try {
@@ -256,9 +331,65 @@ export function Gamecast({
           </div>
         </div>
 
+        <div className="gc-linescore">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                {Array.from({ length: line.innings }).map((_, i) => (
+                  <th key={i}>{i + 1}</th>
+                ))}
+                <th className="gc-ls-total">R</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{awayAbbr}</td>
+                {line.away.map((r, i) => (
+                  <td key={i}>{r < 0 ? "" : r}</td>
+                ))}
+                <td className="gc-ls-total">{cur?.awayScore ?? 0}</td>
+              </tr>
+              <tr>
+                <td>{homeAbbr}</td>
+                {line.home.map((r, i) => (
+                  <td key={i}>{r < 0 ? "" : r}</td>
+                ))}
+                <td className="gc-ls-total">{cur?.homeScore ?? 0}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="gc-wp" aria-label="Win probability">
+          <div className="gc-wp-bar">
+            <span className="gc-wp-fill" style={{ width: `${wpHomePct}%` }} />
+          </div>
+          <div className="gc-wp-labels">
+            <span>
+              {homeAbbr} {wpHomePct}%
+            </span>
+            <span>
+              {awayAbbr} {100 - wpHomePct}%
+            </span>
+          </div>
+        </div>
+
         <div className="gc-stage">
           <div className="gc-field-wrap">
             <GameField bit={bit} bases={bases} />
+            {batted ? (
+              <span
+                key={`ball-${idx}`}
+                className="gc-ball"
+                style={
+                  {
+                    "--bx": `${batted.x}%`,
+                    "--by": `${batted.y}%`,
+                  } as CSSProperties
+                }
+              />
+            ) : null}
           </div>
           {broadcast ? (
             <StrikeZone

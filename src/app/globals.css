@@ -1082,6 +1082,67 @@ select.field-input option {
   background: var(--bit-edge);
 }
 
+/* Line score */
+.gc-linescore {
+  overflow-x: auto;
+  margin-bottom: 0.6rem;
+}
+.gc-linescore table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--gc-font);
+  font-size: 0.62rem;
+}
+.gc-root.bit64 .gc-linescore table {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+.gc-linescore th,
+.gc-linescore td {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.25rem 0.4rem;
+  text-align: center;
+  color: #9ab0a4;
+  min-width: 1.3rem;
+}
+.gc-linescore td:first-child,
+.gc-linescore th:first-child {
+  text-align: left;
+  color: var(--chalk);
+  font-weight: 600;
+}
+.gc-linescore .gc-ls-total {
+  color: var(--bit-edge);
+  font-weight: 700;
+}
+
+/* Win probability */
+.gc-wp {
+  margin-bottom: 0.65rem;
+}
+.gc-wp-bar {
+  height: 8px;
+  width: 100%;
+  background: linear-gradient(90deg, #c43c2a, #c43c2a);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  position: relative;
+}
+.gc-wp-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #2a6ac4, #4a9de0);
+  transition: width 320ms var(--ease);
+}
+.gc-wp-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6rem;
+  color: var(--fog);
+}
+
 .gc-stage {
   display: grid;
   gap: 0.65rem;
@@ -1217,6 +1278,45 @@ select.field-input option {
   box-shadow:
     inset 0 0 36px rgba(0, 0, 0, 0.45),
     0 0 36px rgba(255, 224, 102, 0.22);
+}
+
+/* Ball-in-play flight */
+.gc-ball {
+  position: absolute;
+  left: 50%;
+  top: 82%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.85);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 4;
+  animation: gcBatted 0.85s ease-out forwards;
+}
+@keyframes gcBatted {
+  0% {
+    left: 50%;
+    top: 82%;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    left: var(--bx, 50%);
+    top: var(--by, 20%);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gc-ball {
+    animation: none;
+    opacity: 0;
+  }
 }
 .gc-field {
   width: 100%;
