@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
-import { Gamecast } from "@/components/Gamecast";
+import { GameViewer } from "@/components/GameViewer";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatIp, type BatterBox, type PitcherBox, type PlayEvent } from "@/lib/sim";
@@ -83,7 +83,7 @@ export default async function GamePage({
         ) : (
           <>
             <div className="theater-stage fade-up">
-              <Gamecast
+              <GameViewer
                 awayName={game.awayTeam.name}
                 homeName={game.homeTeam.name}
                 awayAbbr={game.awayTeam.abbreviation}
