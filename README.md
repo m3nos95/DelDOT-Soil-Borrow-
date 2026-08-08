@@ -42,6 +42,13 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Demo account (created by seed): `aaron` / `hardball`
 
+## Deploy for free (Vercel + Turso)
+
+Host the full app at $0 on Vercel (Next.js) with a Turso (hosted libSQL)
+database. The app auto-detects Turso when `TURSO_DATABASE_URL` is set and
+otherwise uses the local SQLite file. See **[DEPLOY.md](DEPLOY.md)** for the
+step-by-step guide.
+
 Player pool ships as `data/career_players.json` (built from FanGraphs). To refresh:
 
 ```bash
@@ -62,6 +69,6 @@ Era locks keep rates apples-to-apples — Hunter Greene doesn’t get a free K p
 ## Stack
 
 - Next.js (App Router)
-- Prisma + SQLite
+- Prisma + SQLite locally, Turso (libSQL) in production
 - FanGraphs leaders API → career cards
 - Cookie sessions (JWT)
