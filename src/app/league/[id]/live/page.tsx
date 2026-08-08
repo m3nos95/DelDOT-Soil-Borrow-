@@ -4,7 +4,9 @@ import { AppHeader } from "@/components/AppHeader";
 import { LeagueNav } from "@/components/LeagueNav";
 import {
   AutoAdvanceToggle,
+  LiveAutoRefresh,
   PlayDayButton,
+  RunOutButton,
 } from "@/components/LiveDayControls";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -131,6 +133,9 @@ export default async function LivePage({
 
   return (
     <div className="page-shell">
+      <LiveAutoRefresh
+        active={league.status === "season" || league.status === "playoffs"}
+      />
       <AppHeader user={session} leagueName={league.name} />
       <main className="mx-auto max-w-6xl px-5 py-8 sm:py-10">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -165,7 +170,12 @@ export default async function LivePage({
               <h2 className="font-[family-name:var(--font-display)] text-3xl tracking-wide text-[var(--foul)]">
                 {currentDay != null ? `Day ${currentDay} — today's slate` : "No games scheduled"}
               </h2>
-              {currentDay != null ? <PlayDayButton leagueId={id} /> : null}
+              {currentDay != null ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <PlayDayButton leagueId={id} />
+                  <RunOutButton leagueId={id} />
+                </div>
+              ) : null}
             </div>
             {league.autoAdvance ? (
               <p className="mb-4 text-sm text-[var(--fog)]">

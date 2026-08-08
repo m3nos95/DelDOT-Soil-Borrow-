@@ -33,7 +33,14 @@ import {
   validateTradePieces,
 } from "@/lib/trades";
 
-export type ActionState = { error?: string; ok?: boolean; message?: string };
+export type ActionState = {
+  error?: string;
+  ok?: boolean;
+  message?: string;
+  done?: boolean;
+  simulated?: number;
+  status?: string;
+};
 
 async function mustUser() {
   const user = await requireUser();
@@ -376,7 +383,8 @@ export async function simDayAction(leagueId: string): Promise<ActionState> {
   }
 
   if (status === "season") await runCpuFrontOffice(leagueId);
-  await simulateNextDay(leagueId);
+  const res = await simulateNextDay(leagueId);
+  const after = await prisma.league.findUnique({ where: { id: leagueId } });
   revalidatePath(`/league/${leagueId}`);
   revalidatePath(`/league/${leagueId}/standings`);
   revalidatePath(`/league/${leagueId}/stats`);
@@ -384,7 +392,13 @@ export async function simDayAction(leagueId: string): Promise<ActionState> {
   revalidatePath(`/league/${leagueId}/trades`);
   revalidatePath(`/league/${leagueId}/live`);
   revalidatePath(`/league/${leagueId}/awards`);
-  return { ok: true };
+  revalidatePath(`/league/${leagueId}/playoffs`);
+  return {
+    ok: true,
+    simulated: res.simulated,
+    status: after?.status,
+    done: after?.status === "complete",
+  };
 }
 
 export async function setAutoAdvanceAction(
