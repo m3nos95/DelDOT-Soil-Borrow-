@@ -27,6 +27,7 @@ var HardballSim = (() => {
     NEUTRAL_PARK: () => NEUTRAL_PARK,
     PARK_BY_CODE: () => PARK_BY_CODE,
     batterHandVs: () => batterHandVs,
+    buildPitchSequence: () => buildPitchSequence,
     deriveDefense: () => deriveDefense,
     deriveSpeed: () => deriveSpeed,
     dynastyEraById: () => dynastyEraById,
@@ -224,6 +225,119 @@ var HardballSim = (() => {
       r ^= r + Math.imul(r ^ r >>> 7, 61 | r);
       return ((r ^ r >>> 14) >>> 0) / 4294967296;
     };
+  }
+  var PITCH_BASE_VELO = {
+    FF: 94,
+    SI: 93,
+    SL: 85,
+    CH: 84,
+    CB: 79
+  };
+  function choosePitch(pitcher, prand) {
+    var _a;
+    const stuff = (_a = pitcher.stuff) != null ? _a : 50;
+    const r = prand();
+    let type;
+    if (r < 0.52) type = prand() < 0.18 ? "SI" : "FF";
+    else if (r < 0.74) type = "SL";
+    else if (r < 0.9) type = "CH";
+    else type = "CB";
+    const velo = Math.round(
+      PITCH_BASE_VELO[type] + (stuff - 50) * 0.12 + (prand() - 0.5) * 3
+    );
+    return { type, velo };
+  }
+  function pitchLocation(result, prand) {
+    const edge = () => (prand() - 0.5) * 2;
+    const outAxis = () => (prand() < 0.5 ? -1 : 1) * (1.1 + prand() * 0.6);
+    switch (result) {
+      case "called":
+        return { x: edge() * 0.85, y: edge() * 0.85 };
+      case "swinging":
+        if (prand() < 0.6) {
+          return {
+            x: (prand() < 0.5 ? -1 : 1) * (0.7 + prand() * 0.5),
+            y: -Math.abs(edge()) * 1.1 - 0.15
+          };
+        }
+        return { x: edge() * 0.9, y: edge() * 0.9 };
+      case "foul":
+        return { x: edge() * 1, y: edge() * 1 };
+      case "inplay":
+        return { x: edge() * 0.7, y: edge() * 0.7 };
+      case "hbp":
+        return { x: -1.5 - prand() * 0.3, y: -0.3 - prand() * 0.6 };
+      case "ball":
+      default:
+        return prand() < 0.5 ? { x: outAxis(), y: edge() * 1.1 } : { x: edge() * 1.1, y: outAxis() };
+    }
+  }
+  function weightedInt(weights, prand) {
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = prand() * total;
+    for (let i = 0; i < weights.length; i++) {
+      r -= weights[i];
+      if (r < 0) return i;
+    }
+    return weights.length - 1;
+  }
+  function buildPitchSequence(outcome, pitcher, prand) {
+    const pitches = [];
+    let balls = 0;
+    let strikes = 0;
+    if (outcome === "K") {
+      balls = weightedInt([0.34, 0.3, 0.22, 0.14], prand);
+      strikes = 2;
+    } else if (outcome === "BB") {
+      strikes = weightedInt([0.3, 0.35, 0.35], prand);
+      balls = 3;
+    } else if (outcome === "HBP") {
+      balls = weightedInt([0.5, 0.3, 0.2], prand);
+      strikes = weightedInt([0.5, 0.3, 0.2], prand);
+    } else {
+      balls = weightedInt([0.4, 0.3, 0.2, 0.1], prand);
+      strikes = weightedInt([0.42, 0.34, 0.24], prand);
+    }
+    const setup = [
+      ...Array(balls).fill("B"),
+      ...Array(strikes).fill("S")
+    ];
+    for (let i = setup.length - 1; i > 0; i--) {
+      const j = Math.floor(prand() * (i + 1));
+      [setup[i], setup[j]] = [setup[j], setup[i]];
+    }
+    let curB = 0;
+    let curS = 0;
+    const push = (result) => {
+      const { type, velo } = choosePitch(pitcher, prand);
+      const loc = pitchLocation(result, prand);
+      pitches.push({ type, velo, x: loc.x, y: loc.y, result, balls: curB, strikes: curS });
+    };
+    for (const s of setup) {
+      if (s === "B") {
+        push("ball");
+        curB += 1;
+      } else {
+        const rr = prand();
+        const res = rr < 0.24 ? "foul" : rr < 0.62 ? "swinging" : "called";
+        push(res);
+        curS = Math.min(2, curS + 1);
+      }
+    }
+    if (curS === 2 && outcome !== "BB") {
+      const extraFouls = weightedInt([0.55, 0.25, 0.13, 0.07], prand);
+      for (let i = 0; i < extraFouls; i++) push("foul");
+    }
+    if (outcome === "K") {
+      push(prand() < 0.66 ? "swinging" : "called");
+    } else if (outcome === "BB") {
+      push("ball");
+    } else if (outcome === "HBP") {
+      push("hbp");
+    } else {
+      push("inplay");
+    }
+    return pitches;
   }
   function deriveSpeed(p) {
     if (p.isPitcher) return 30;
@@ -519,12 +633,13 @@ var HardballSim = (() => {
     };
   }
   function simulateGame(opts) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     const rand = mulberry32((_a = opts.seed) != null ? _a : Date.now());
+    const prand = mulberry32((((_b = opts.seed) != null ? _b : Date.now()) >>> 0 ^ 2654435769) >>> 0);
     const playByPlay = [];
     const inningScores = [];
-    const park = (_b = opts.park) != null ? _b : NEUTRAL_PARK;
-    const era = (_c = opts.era) != null ? _c : ERAS.neutral;
+    const park = (_c = opts.park) != null ? _c : NEUTRAL_PARK;
+    const era = (_d = opts.era) != null ? _d : ERAS.neutral;
     const homeGlove = lineupDefense(opts.homeLineup);
     const awayGlove = lineupDefense(opts.awayLineup);
     const awayBatters = new Map(
@@ -535,8 +650,8 @@ var HardballSim = (() => {
     );
     const homePitcherBoxes = [];
     const awayPitcherBoxes = [];
-    const homeSp = (_f = (_d = opts.homeStaff.find((a) => a.role === "SP")) == null ? void 0 : _d.player) != null ? _f : (_e = opts.homeStaff[0]) == null ? void 0 : _e.player;
-    const awaySp = (_i = (_g = opts.awayStaff.find((a) => a.role === "SP")) == null ? void 0 : _g.player) != null ? _i : (_h = opts.awayStaff[0]) == null ? void 0 : _h.player;
+    const homeSp = (_g = (_e = opts.homeStaff.find((a) => a.role === "SP")) == null ? void 0 : _e.player) != null ? _g : (_f = opts.homeStaff[0]) == null ? void 0 : _f.player;
+    const awaySp = (_j = (_h = opts.awayStaff.find((a) => a.role === "SP")) == null ? void 0 : _h.player) != null ? _j : (_i = opts.awayStaff[0]) == null ? void 0 : _i.player;
     if (!homeSp || !awaySp) throw new Error("Each team needs a starting pitcher");
     const homePen = opts.homeStaff.filter((a) => a.role !== "SP");
     const awayPen = opts.awayStaff.filter((a) => a.role !== "SP");
@@ -556,7 +671,7 @@ var HardballSim = (() => {
       Boolean(bases[1]),
       Boolean(bases[2])
     ];
-    const log = (half, text, sit = {}) => {
+    const log = (half, text, sit = {}, extra = {}) => {
       var _a2, _b2, _c2;
       const fieldingHome = half === "top";
       const arm = fieldingHome ? homeArm : awayArm;
@@ -568,7 +683,9 @@ var HardballSim = (() => {
         homeScore,
         outs: (_a2 = sit.outs) != null ? _a2 : 0,
         bases: packBases((_b2 = sit.bases) != null ? _b2 : [null, null, null]),
-        pitcher: (_c2 = arm == null ? void 0 : arm.player.name) != null ? _c2 : ""
+        pitcher: (_c2 = arm == null ? void 0 : arm.player.name) != null ? _c2 : "",
+        pitches: extra.pitches,
+        batter: extra.batter
       });
     };
     const makeLive = (player, role) => {
@@ -704,6 +821,8 @@ var HardballSim = (() => {
           homeBat: !fieldingHome
         };
         const outcome = resolvePa(batter, arm, bases, outs, rand, climate);
+        const pitches = buildPitchSequence(outcome, arm.player, prand);
+        const pa_ = { pitches, batter: batter.name };
         const prevHome = homeScore;
         const prevAway = awayScore;
         const creditRun = (runner, rbiBatter) => {
@@ -727,7 +846,7 @@ var HardballSim = (() => {
           arm.box.ip += 1 / 3;
           arm.outsRecorded += 1;
           const tag = platoon < 0.85 && hand === arm.player.throws ? ` (tough ${hand}HB vs ${arm.player.throws}HP)` : "";
-          log(half, `${batter.name} strikes out${tag}.`, { outs, bases });
+          log(half, `${batter.name} strikes out${tag}.`, { outs, bases }, pa_);
         } else if (outcome === "GIDP") {
           box.ab += 1;
           arm.box.ip += 2 / 3;
@@ -738,7 +857,8 @@ var HardballSim = (() => {
           log(
             half,
             `${batter.name} grounds into a double play (${runner.name} out at second).`,
-            { outs, bases }
+            { outs, bases },
+            pa_
           );
         } else if (outcome === "BB" || outcome === "HBP") {
           if (outcome === "BB") {
@@ -751,22 +871,24 @@ var HardballSim = (() => {
             bases[2] = bases[1];
             bases[1] = bases[0];
             bases[0] = { player: batter };
-            log(half, `${batter.name} ${label}, forcing in a run.`, {
-              outs,
-              bases
-            });
+            log(
+              half,
+              `${batter.name} ${label}, forcing in a run.`,
+              { outs, bases },
+              pa_
+            );
           } else if (bases[0] && bases[1]) {
             bases[2] = bases[1];
             bases[1] = bases[0];
             bases[0] = { player: batter };
-            log(half, `${batter.name} ${label}.`, { outs, bases });
+            log(half, `${batter.name} ${label}.`, { outs, bases }, pa_);
           } else if (bases[0]) {
             bases[1] = bases[0];
             bases[0] = { player: batter };
-            log(half, `${batter.name} ${label}.`, { outs, bases });
+            log(half, `${batter.name} ${label}.`, { outs, bases }, pa_);
           } else {
             bases[0] = { player: batter };
-            log(half, `${batter.name} ${label}.`, { outs, bases });
+            log(half, `${batter.name} ${label}.`, { outs, bases }, pa_);
           }
         } else if (outcome === "OUT") {
           outs += 1;
@@ -782,12 +904,14 @@ var HardballSim = (() => {
           if (bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25) {
             creditRun(bases[2].player, true);
             bases[2] = null;
-            log(half, `${batter.name} ${kind} \u2014 run scores from third.`, {
-              outs,
-              bases
-            });
+            log(
+              half,
+              `${batter.name} ${kind} \u2014 run scores from third.`,
+              { outs, bases },
+              pa_
+            );
           } else {
-            log(half, `${batter.name} ${kind}.`, { outs, bases });
+            log(half, `${batter.name} ${kind}.`, { outs, bases }, pa_);
           }
         } else {
           const hit = outcome === "1B" ? 1 : outcome === "2B" ? 2 : outcome === "3B" ? 3 : 4;
@@ -812,7 +936,7 @@ var HardballSim = (() => {
           }
           if (note) text += ` (${note})`;
           text += ".";
-          log(half, text, { outs, bases });
+          log(half, text, { outs, bases }, pa_);
         }
         noteLeadChange(fieldingHome, prevHome, prevAway);
         if (outs < 3) {
@@ -838,14 +962,14 @@ var HardballSim = (() => {
       if (b.decision === "W" || b.decision === "L") b.decision = "";
     }
     if (homeScore > awayScore) {
-      ((_j = decision.win) != null ? _j : homePitcherBoxes[0]).decision = "W";
-      ((_k = decision.loss) != null ? _k : awayPitcherBoxes[0]).decision = "L";
+      ((_k = decision.win) != null ? _k : homePitcherBoxes[0]).decision = "W";
+      ((_l = decision.loss) != null ? _l : awayPitcherBoxes[0]).decision = "L";
       if (decision.homeSave && decision.homeSave.box !== decision.win && homeScore - awayScore <= 3 && decision.homeSave.box.ip > 0) {
         decision.homeSave.box.decision = "S";
       }
     } else if (awayScore > homeScore) {
-      ((_l = decision.win) != null ? _l : awayPitcherBoxes[0]).decision = "W";
-      ((_m = decision.loss) != null ? _m : homePitcherBoxes[0]).decision = "L";
+      ((_m = decision.win) != null ? _m : awayPitcherBoxes[0]).decision = "W";
+      ((_n = decision.loss) != null ? _n : homePitcherBoxes[0]).decision = "L";
       if (decision.awaySave && decision.awaySave.box !== decision.win && awayScore - homeScore <= 3 && decision.awaySave.box.ip > 0) {
         decision.awaySave.box.decision = "S";
       }

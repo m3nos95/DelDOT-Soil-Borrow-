@@ -68,6 +68,8 @@ model League {
   /// Dynasty era lock: pre1950 | classic | freeagent | modern | open
   era             String   @default("modern")
   status          String   @default("forming") // forming | drafting | season | complete
+  /// When true, a scheduled job advances one game-day per real day (MLB-like cadence)
+  autoAdvance     Boolean  @default(false)
   commissionerId  String
   commissioner    User     @relation("LeagueCommissioner", fields: [commissionerId], references: [id])
   createdAt       DateTime @default(now())

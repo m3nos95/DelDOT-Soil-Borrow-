@@ -378,6 +378,27 @@ export async function simDayAction(leagueId: string): Promise<ActionState> {
   revalidatePath(`/league/${leagueId}/stats`);
   revalidatePath(`/league/${leagueId}/free-agency`);
   revalidatePath(`/league/${leagueId}/trades`);
+  revalidatePath(`/league/${leagueId}/live`);
+  revalidatePath(`/league/${leagueId}/awards`);
+  return { ok: true };
+}
+
+export async function setAutoAdvanceAction(
+  leagueId: string,
+  on: boolean,
+): Promise<ActionState> {
+  const user = await mustUser();
+  const league = await prisma.league.findUnique({ where: { id: leagueId } });
+  if (!league) return { error: "League not found" };
+  if (league.commissionerId !== user.id) {
+    return { error: "Only the commissioner can change the schedule cadence" };
+  }
+  await prisma.league.update({
+    where: { id: leagueId },
+    data: { autoAdvance: on },
+  });
+  revalidatePath(`/league/${leagueId}/live`);
+  revalidatePath(`/league/${leagueId}`);
   return { ok: true };
 }
 

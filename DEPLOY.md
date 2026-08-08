@@ -66,8 +66,23 @@ You can re-run `npm run db:turso:migrate` any time you add a new migration.
    | `TURSO_DATABASE_URL` | `libsql://hardball-you.turso.io`        |
    | `TURSO_AUTH_TOKEN`   | your Turso token                        |
    | `AUTH_SECRET`        | `openssl rand -hex 32`                  |
+   | `CRON_SECRET`        | `openssl rand -hex 32` (optional, for auto-play) |
 
 5. Click **Deploy**. First build takes ~1–2 min.
+
+### Daily auto-play (MLB-like cadence)
+
+The repo ships a `vercel.json` cron that hits `/api/cron/advance` once a day
+(16:00 UTC). For each league with **Daily auto-play** turned on (Live tab →
+commissioner toggle) it simulates the next game-day, so the season unfolds one
+day at a time like a real calendar. Managers open the **Live** tab to watch that
+day's games pitch-by-pitch.
+
+- Set `CRON_SECRET` in Vercel and the cron route is protected (Vercel sends it
+  automatically as a Bearer token).
+- Vercel Hobby runs crons once per day — perfect for a one-day-per-day cadence.
+- Leave auto-play off to advance manually with **Play today's games** / **Sim
+  week** instead.
 
 Your app will be live at `https://<project>.vercel.app`. Log in with
 `aaron` / `hardball`, or register a new account and start a league.

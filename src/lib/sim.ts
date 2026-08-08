@@ -70,6 +70,22 @@ export type StaffArm = {
   role: BullpenRole;
 };
 
+export type PitchType = "FF" | "SI" | "SL" | "CB" | "CH";
+
+export type Pitch = {
+  type: PitchType;
+  /** approximate velocity, mph */
+  velo: number;
+  /** normalized horizontal location; strike zone is within [-1, 1] */
+  x: number;
+  /** normalized vertical location; strike zone is within [-1, 1] */
+  y: number;
+  result: "ball" | "called" | "swinging" | "foul" | "inplay" | "hbp";
+  /** count BEFORE this pitch */
+  balls: number;
+  strikes: number;
+};
+
 export type PlayEvent = {
   inning: number;
   half: "top" | "bottom";
@@ -82,6 +98,10 @@ export type PlayEvent = {
   bases: [boolean, boolean, boolean];
   /** Pitcher on the mound after this event */
   pitcher: string;
+  /** Batter at the plate (PA-resolving events only) */
+  batter?: string;
+  /** Pitch-by-pitch sequence for this plate appearance (broadcast view) */
+  pitches?: Pitch[];
 };
 
 export type BatterBox = {
@@ -147,6 +167,155 @@ function mulberry32(seed: number) {
     r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+const PITCH_BASE_VELO: Record<PitchType, number> = {
+  FF: 94,
+  SI: 93,
+  SL: 85,
+  CH: 84,
+  CB: 79,
+};
+
+function choosePitch(
+  pitcher: SimPlayer,
+  prand: () => number,
+): { type: PitchType; velo: number } {
+  const stuff = pitcher.stuff ?? 50;
+  const r = prand();
+  let type: PitchType;
+  if (r < 0.52) type = prand() < 0.18 ? "SI" : "FF";
+  else if (r < 0.74) type = "SL";
+  else if (r < 0.9) type = "CH";
+  else type = "CB";
+  const velo = Math.round(
+    PITCH_BASE_VELO[type] + (stuff - 50) * 0.12 + (prand() - 0.5) * 3,
+  );
+  return { type, velo };
+}
+
+function pitchLocation(
+  result: Pitch["result"],
+  prand: () => number,
+): { x: number; y: number } {
+  const edge = () => (prand() - 0.5) * 2; // -1..1
+  const outAxis = () => (prand() < 0.5 ? -1 : 1) * (1.1 + prand() * 0.6);
+  switch (result) {
+    case "called":
+      return { x: edge() * 0.85, y: edge() * 0.85 };
+    case "swinging":
+      // chase pitches: mostly low / just out of zone
+      if (prand() < 0.6) {
+        return {
+          x: (prand() < 0.5 ? -1 : 1) * (0.7 + prand() * 0.5),
+          y: -Math.abs(edge()) * 1.1 - 0.15,
+        };
+      }
+      return { x: edge() * 0.9, y: edge() * 0.9 };
+    case "foul":
+      return { x: edge() * 1.0, y: edge() * 1.0 };
+    case "inplay":
+      return { x: edge() * 0.7, y: edge() * 0.7 };
+    case "hbp":
+      return { x: -1.5 - prand() * 0.3, y: -0.3 - prand() * 0.6 };
+    case "ball":
+    default:
+      return prand() < 0.5
+        ? { x: outAxis(), y: edge() * 1.1 }
+        : { x: edge() * 1.1, y: outAxis() };
+  }
+}
+
+function weightedInt(weights: number[], prand: () => number): number {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = prand() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r < 0) return i;
+  }
+  return weights.length - 1;
+}
+
+/**
+ * Build a plausible pitch sequence that ends in the already-decided outcome.
+ * Uses an INDEPENDENT rng (prand) so the statistical engine is untouched —
+ * box scores are identical whether or not pitches are generated.
+ */
+export function buildPitchSequence(
+  outcome: Outcome,
+  pitcher: SimPlayer,
+  prand: () => number,
+): Pitch[] {
+  const pitches: Pitch[] = [];
+
+  // Count reached just BEFORE the terminal pitch
+  let balls = 0;
+  let strikes = 0;
+  if (outcome === "K") {
+    balls = weightedInt([0.34, 0.3, 0.22, 0.14], prand);
+    strikes = 2;
+  } else if (outcome === "BB") {
+    strikes = weightedInt([0.3, 0.35, 0.35], prand);
+    balls = 3;
+  } else if (outcome === "HBP") {
+    balls = weightedInt([0.5, 0.3, 0.2], prand);
+    strikes = weightedInt([0.5, 0.3, 0.2], prand);
+  } else {
+    balls = weightedInt([0.4, 0.3, 0.2, 0.1], prand);
+    strikes = weightedInt([0.42, 0.34, 0.24], prand);
+  }
+
+  const setup: ("B" | "S")[] = [
+    ...Array<"B">(balls).fill("B"),
+    ...Array<"S">(strikes).fill("S"),
+  ];
+  for (let i = setup.length - 1; i > 0; i--) {
+    const j = Math.floor(prand() * (i + 1));
+    [setup[i], setup[j]] = [setup[j], setup[i]];
+  }
+
+  let curB = 0;
+  let curS = 0;
+  const push = (result: Pitch["result"]) => {
+    const { type, velo } = choosePitch(pitcher, prand);
+    const loc = pitchLocation(result, prand);
+    pitches.push({ type, velo, x: loc.x, y: loc.y, result, balls: curB, strikes: curS });
+  };
+
+  for (const s of setup) {
+    if (s === "B") {
+      push("ball");
+      curB += 1;
+    } else {
+      // Setup strikes always advance the count. A foul here is a foul with
+      // <2 strikes, which is still a strike; foul-offs at two strikes are
+      // added separately below and do not advance.
+      const rr = prand();
+      const res: Pitch["result"] =
+        rr < 0.24 ? "foul" : rr < 0.62 ? "swinging" : "called";
+      push(res);
+      curS = Math.min(2, curS + 1);
+    }
+  }
+
+  // Foul-offs at two strikes add drama without changing the outcome
+  if (curS === 2 && outcome !== "BB") {
+    const extraFouls = weightedInt([0.55, 0.25, 0.13, 0.07], prand);
+    for (let i = 0; i < extraFouls; i++) push("foul");
+  }
+
+  // Terminal pitch
+  if (outcome === "K") {
+    push(prand() < 0.66 ? "swinging" : "called");
+  } else if (outcome === "BB") {
+    push("ball");
+  } else if (outcome === "HBP") {
+    push("hbp");
+  } else {
+    push("inplay");
+  }
+
+  return pitches;
 }
 
 export function deriveSpeed(p: {
@@ -610,6 +779,9 @@ export function simulateGame(opts: {
   era?: EraEnv;
 }): GameResult {
   const rand = mulberry32(opts.seed ?? Date.now());
+  // Independent stream for pitch-by-pitch flavor — never perturbs `rand`,
+  // so box scores / stats are byte-for-byte the same with or without it.
+  const prand = mulberry32((((opts.seed ?? Date.now()) >>> 0) ^ 0x9e3779b9) >>> 0);
   const playByPlay: PlayEvent[] = [];
   const inningScores: number[] = [];
   const park = opts.park ?? NEUTRAL_PARK;
@@ -663,6 +835,7 @@ export function simulateGame(opts: {
     half: "top" | "bottom",
     text: string,
     sit: { outs?: number; bases?: BaseOccupant[] } = {},
+    extra: { pitches?: Pitch[]; batter?: string } = {},
   ) => {
     const fieldingHome = half === "top";
     const arm = fieldingHome ? homeArm : awayArm;
@@ -675,6 +848,8 @@ export function simulateGame(opts: {
       outs: sit.outs ?? 0,
       bases: packBases(sit.bases ?? [null, null, null]),
       pitcher: arm?.player.name ?? "",
+      pitches: extra.pitches,
+      batter: extra.batter,
     });
   };
 
@@ -852,6 +1027,8 @@ export function simulateGame(opts: {
         homeBat: !fieldingHome,
       };
       const outcome = resolvePa(batter, arm, bases, outs, rand, climate);
+      const pitches = buildPitchSequence(outcome, arm.player, prand);
+      const pa_ = { pitches, batter: batter.name };
 
       const prevHome = homeScore;
       const prevAway = awayScore;
@@ -882,7 +1059,7 @@ export function simulateGame(opts: {
           platoon < 0.85 && hand === arm.player.throws
             ? ` (tough ${hand}HB vs ${arm.player.throws}HP)`
             : "";
-        log(half, `${batter.name} strikes out${tag}.`, { outs, bases });
+        log(half, `${batter.name} strikes out${tag}.`, { outs, bases }, pa_);
       } else if (outcome === "GIDP") {
         box.ab += 1;
         arm.box.ip += 2 / 3;
@@ -894,6 +1071,7 @@ export function simulateGame(opts: {
           half,
           `${batter.name} grounds into a double play (${runner.name} out at second).`,
           { outs, bases },
+          pa_,
         );
       } else if (outcome === "BB" || outcome === "HBP") {
         if (outcome === "BB") {
@@ -906,22 +1084,24 @@ export function simulateGame(opts: {
           bases[2] = bases[1];
           bases[1] = bases[0];
           bases[0] = { player: batter };
-          log(half, `${batter.name} ${label}, forcing in a run.`, {
-            outs,
-            bases,
-          });
+          log(
+            half,
+            `${batter.name} ${label}, forcing in a run.`,
+            { outs, bases },
+            pa_,
+          );
         } else if (bases[0] && bases[1]) {
           bases[2] = bases[1];
           bases[1] = bases[0];
           bases[0] = { player: batter };
-          log(half, `${batter.name} ${label}.`, { outs, bases });
+          log(half, `${batter.name} ${label}.`, { outs, bases }, pa_);
         } else if (bases[0]) {
           bases[1] = bases[0];
           bases[0] = { player: batter };
-          log(half, `${batter.name} ${label}.`, { outs, bases });
+          log(half, `${batter.name} ${label}.`, { outs, bases }, pa_);
         } else {
           bases[0] = { player: batter };
-          log(half, `${batter.name} ${label}.`, { outs, bases });
+          log(half, `${batter.name} ${label}.`, { outs, bases }, pa_);
         }
       } else if (outcome === "OUT") {
         outs += 1;
@@ -940,12 +1120,14 @@ export function simulateGame(opts: {
         if (bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25) {
           creditRun(bases[2]!.player, true);
           bases[2] = null;
-          log(half, `${batter.name} ${kind} — run scores from third.`, {
-            outs,
-            bases,
-          });
+          log(
+            half,
+            `${batter.name} ${kind} — run scores from third.`,
+            { outs, bases },
+            pa_,
+          );
         } else {
-          log(half, `${batter.name} ${kind}.`, { outs, bases });
+          log(half, `${batter.name} ${kind}.`, { outs, bases }, pa_);
         }
       } else {
         const hit =
@@ -978,7 +1160,7 @@ export function simulateGame(opts: {
         }
         if (note) text += ` (${note})`;
         text += ".";
-        log(half, text, { outs, bases });
+        log(half, text, { outs, bases }, pa_);
       }
 
       noteLeadChange(fieldingHome, prevHome, prevAway);

@@ -11,6 +11,11 @@ const LINKS = [
   },
   { href: "/draft", label: "Draft", statuses: ["drafting"] },
   {
+    href: "/live",
+    label: "Live",
+    statuses: ["season", "complete"],
+  },
+  {
     href: "/free-agency",
     label: "Free agents",
     statuses: ["season"],

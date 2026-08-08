@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GameField } from "@/components/GameField";
+import { StrikeZone } from "@/components/StrikeZone";
 import type { PlayEvent } from "@/lib/sim";
 
 type Props = {
@@ -15,15 +16,23 @@ type Props = {
 };
 
 type BitMode = "bit16" | "bit64";
+type Phase = "pitch" | "result";
 
-function speedMs(level: number) {
-  return [1400, 1000, 700, 420, 220][Math.min(4, Math.max(0, level - 1))];
+function resultMs(level: number) {
+  return [1600, 1150, 800, 480, 260][Math.min(4, Math.max(0, level - 1))];
+}
+function pitchMs(level: number) {
+  return [820, 600, 430, 270, 150][Math.min(4, Math.max(0, level - 1))];
 }
 
 function isBigPlay(text: string) {
   return /homers|forcing in a run|run scores|runs score|steals|caught stealing|enters from the pen|double play|first to third|scores from/i.test(
     text,
   );
+}
+
+function hasPitches(ev: PlayEvent | null | undefined) {
+  return !!ev?.pitches && ev.pitches.length > 0;
 }
 
 export function Gamecast({
@@ -36,53 +45,128 @@ export function Gamecast({
   finalHome,
 }: Props) {
   const [idx, setIdx] = useState(-1);
+  const [pitchIdx, setPitchIdx] = useState(0);
+  const [phase, setPhase] = useState<Phase>("result");
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(3);
   const [done, setDone] = useState(false);
   const [bit, setBit] = useState<BitMode>("bit64");
+  const [broadcast, setBroadcast] = useState(true);
   const speedRef = useRef(speed);
-
   speedRef.current = speed;
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("hardball-bit");
-      if (saved === "bit16" || saved === "bit64") setBit(saved);
+      const savedBit = localStorage.getItem("hardball-bit");
+      if (savedBit === "bit16" || savedBit === "bit64") setBit(savedBit);
+      const savedCast = localStorage.getItem("hardball-broadcast");
+      if (savedCast === "0") setBroadcast(false);
     } catch {
       /* ignore */
     }
   }, []);
 
-  const play = idx >= 0 ? plays[idx] : null;
+  const cur = idx >= 0 ? plays[idx] : null;
+
+  // Enter a fresh event: start pitch sub-steps when broadcasting a PA.
+  const enterEvent = useCallback(
+    (newIdx: number) => {
+      setIdx(newIdx);
+      const ev = plays[newIdx];
+      if (broadcast && hasPitches(ev)) {
+        setPhase("pitch");
+        setPitchIdx(0);
+      } else {
+        setPhase("result");
+        setPitchIdx(0);
+        if (newIdx >= plays.length - 1) {
+          setDone(true);
+          setPlaying(false);
+        }
+      }
+    },
+    [broadcast, plays],
+  );
+
+  const step = useCallback(() => {
+    if (plays.length === 0) return;
+    if (idx < 0) {
+      enterEvent(0);
+      return;
+    }
+    const ev = plays[idx];
+    const pcount = broadcast && hasPitches(ev) ? ev!.pitches!.length : 0;
+    if (phase === "pitch") {
+      if (pitchIdx < pcount - 1) {
+        setPitchIdx((p) => p + 1);
+      } else {
+        setPhase("result");
+        if (idx >= plays.length - 1) {
+          setDone(true);
+          setPlaying(false);
+        }
+      }
+      return;
+    }
+    // result phase → advance to the next event
+    if (idx >= plays.length - 1) {
+      setDone(true);
+      setPlaying(false);
+      return;
+    }
+    enterEvent(idx + 1);
+  }, [broadcast, enterEvent, idx, phase, pitchIdx, plays]);
 
   useEffect(() => {
     if (!playing || done || plays.length === 0) return;
-    const t = window.setTimeout(() => {
-      setIdx((i) => {
-        if (i >= plays.length - 1) {
-          setDone(true);
-          setPlaying(false);
-          return i;
-        }
-        const next = i + 1;
-        if (next >= plays.length - 1) {
-          setDone(true);
-          setPlaying(false);
-        }
-        return next;
-      });
-    }, speedMs(speedRef.current));
+    const inPitch = phase === "pitch" && broadcast && hasPitches(cur);
+    const ms = inPitch ? pitchMs(speedRef.current) : resultMs(speedRef.current);
+    const t = window.setTimeout(step, ms);
     return () => window.clearTimeout(t);
-  }, [playing, idx, done, plays.length]);
+  }, [playing, done, plays.length, phase, pitchIdx, idx, broadcast, cur, step]);
 
-  const bases = (play?.bases ?? [false, false, false]) as [
+  const showResult = phase === "result" || !broadcast || !hasPitches(cur);
+
+  // Situation shown: during a live at-bat, show the pre-PA state (prev event).
+  const sitEv = showResult ? cur : (idx > 0 ? plays[idx - 1] : cur);
+  const bases = (sitEv?.bases ?? [false, false, false]) as [
     boolean,
     boolean,
     boolean,
   ];
-  const outs = play?.outs ?? 0;
+  const outs = sitEv?.outs ?? 0;
+  const awayScore = sitEv?.awayScore ?? 0;
+  const homeScore = sitEv?.homeScore ?? 0;
+
   const feed = plays.slice(0, Math.max(0, idx + 1)).slice(-10);
-  const big = !!(play && isBigPlay(play.text));
+  const big = !!(cur && showResult && isBigPlay(cur.text));
+
+  // Count for the strike-zone panel
+  let dispBalls = 0;
+  let dispStrikes = 0;
+  const pv = cur?.pitches;
+  if (pv && pv.length > 0) {
+    const shownN = showResult ? pv.length : pitchIdx + 1;
+    const lastShown = pv[Math.min(shownN, pv.length) - 1];
+    if (shownN < pv.length) {
+      dispBalls = pv[shownN].balls;
+      dispStrikes = pv[shownN].strikes;
+    } else if (lastShown) {
+      dispBalls = lastShown.balls + (lastShown.result === "ball" ? 1 : 0);
+      dispStrikes =
+        lastShown.strikes +
+        (lastShown.result === "called" ||
+        lastShown.result === "swinging" ||
+        (lastShown.result === "foul" && lastShown.strikes < 2)
+          ? 1
+          : 0);
+    }
+  }
+
+  const inLiveAB = broadcast && hasPitches(cur) && !showResult;
+  const abLine = inLiveAB
+    ? `${cur?.batter ?? "Batter"} at the plate`
+    : (cur?.text ?? "Play ball…");
 
   const chooseBit = (mode: BitMode) => {
     setBit(mode);
@@ -93,13 +177,41 @@ export function Gamecast({
     }
   };
 
+  const toggleBroadcast = () => {
+    setBroadcast((b) => {
+      const next = !b;
+      try {
+        localStorage.setItem("hardball-broadcast", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const skipToFinal = () => {
+    setPlaying(false);
+    setPhase("result");
+    setIdx(plays.length - 1);
+    setPitchIdx(Math.max(0, (plays[plays.length - 1]?.pitches?.length ?? 1) - 1));
+    setDone(true);
+  };
+
   return (
     <section className={`gc-root ${bit}${big ? " gc-big-moment" : ""}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-[family-name:var(--font-pixel)] text-xl tracking-wide text-[var(--bit-edge)] sm:text-2xl">
           Gamecast
         </h2>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            className={`gc-bit-btn ${broadcast ? "on" : ""}`}
+            onClick={toggleBroadcast}
+            title="Pitch-by-pitch broadcast"
+          >
+            Broadcast
+          </button>
           <button
             type="button"
             className={`gc-bit-btn ${bit === "bit16" ? "on" : ""}`}
@@ -121,12 +233,12 @@ export function Gamecast({
         <div className="gc-hud">
           <div>
             <div className="gc-team-label">{awayName}</div>
-            <div className="gc-score">{play?.awayScore ?? 0}</div>
+            <div className="gc-score">{awayScore}</div>
           </div>
           <div className="gc-mid">
             <div>
-              {play
-                ? `${play.half === "top" ? "Top" : "Bot"} ${play.inning}`
+              {cur
+                ? `${cur.half === "top" ? "Top" : "Bot"} ${cur.inning}`
                 : "Top 1"}
             </div>
             <div className="gc-outs" aria-label="Outs">
@@ -140,19 +252,32 @@ export function Gamecast({
           </div>
           <div className="text-right">
             <div className="gc-team-label">{homeName}</div>
-            <div className="gc-score">{play?.homeScore ?? 0}</div>
+            <div className="gc-score">{homeScore}</div>
           </div>
         </div>
 
-        <div className="gc-field-wrap">
-          <GameField bit={bit} bases={bases} />
+        <div className="gc-stage">
+          <div className="gc-field-wrap">
+            <GameField bit={bit} bases={bases} />
+          </div>
+          {broadcast ? (
+            <StrikeZone
+              pitches={pv ?? []}
+              shown={showResult ? (pv?.length ?? 0) : pitchIdx + 1}
+              balls={dispBalls}
+              strikes={dispStrikes}
+            />
+          ) : null}
         </div>
 
         <p className="gc-pitcher">
-          {play?.pitcher ? `Pitching · ${play.pitcher}` : "\u00a0"}
+          {cur?.pitcher ? `Pitching · ${cur.pitcher}` : "\u00a0"}
         </p>
-        <p className={`gc-play ${big ? "big" : ""}`} key={idx}>
-          {play?.text ?? "Play ball…"}
+        <p
+          className={`gc-play ${big ? "big" : ""}${inLiveAB ? " live" : ""}`}
+          key={`${idx}-${showResult ? "r" : pitchIdx}`}
+        >
+          {abLine}
         </p>
 
         <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
@@ -171,28 +296,12 @@ export function Gamecast({
             className="gc-ctrl"
             onClick={() => {
               setPlaying(false);
-              setIdx((i) => {
-                if (i >= plays.length - 1) {
-                  setDone(true);
-                  return i;
-                }
-                const next = i + 1;
-                if (next >= plays.length - 1) setDone(true);
-                return next;
-              });
+              step();
             }}
           >
-            Step
+            {broadcast ? "Pitch" : "Step"}
           </button>
-          <button
-            type="button"
-            className="gc-ctrl"
-            onClick={() => {
-              setPlaying(false);
-              setIdx(plays.length - 1);
-              setDone(true);
-            }}
-          >
+          <button type="button" className="gc-ctrl" onClick={skipToFinal}>
             Skip to final
           </button>
           <label className="flex items-center gap-2 font-[family-name:var(--font-pixel)] text-[10px] uppercase tracking-wider text-[#8aa090]">

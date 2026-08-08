@@ -193,6 +193,13 @@ export default async function LeaguePage({
                   Day {nextDay?.dayNumber ?? "—"} next · {remaining} games left
                   {" · "}
                   <Link
+                    href={`/league/${id}/live`}
+                    className="text-[var(--foul)] hover:underline"
+                  >
+                    Live slate
+                  </Link>
+                  {" · "}
+                  <Link
                     href={`/league/${id}/awards`}
                     className="text-[var(--foul)] hover:underline"
                   >
