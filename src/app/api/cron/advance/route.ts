@@ -22,15 +22,15 @@ export async function GET(req: Request) {
   }
 
   const leagues = await prisma.league.findMany({
-    where: { status: "season", autoAdvance: true },
-    select: { id: true },
+    where: { status: { in: ["season", "playoffs"] }, autoAdvance: true },
+    select: { id: true, status: true },
   });
 
   const results: { leagueId: string; simulated: number; day: number | null }[] =
     [];
   for (const l of leagues) {
     try {
-      await runCpuFrontOffice(l.id);
+      if (l.status === "season") await runCpuFrontOffice(l.id);
       const res = await simulateNextDay(l.id);
       results.push({ leagueId: l.id, simulated: res.simulated, day: res.dayNumber });
     } catch (e) {

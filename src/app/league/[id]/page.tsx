@@ -141,7 +141,9 @@ export default async function LeaguePage({
           </section>
         ) : null}
 
-        {league.status === "season" || league.status === "complete" ? (
+        {league.status === "season" ||
+        league.status === "playoffs" ||
+        league.status === "complete" ? (
           <section className="mb-12 grid gap-10 lg:grid-cols-2">
             <div className="panel">
               <h2 className="mb-3 font-[family-name:var(--font-display)] text-3xl tracking-wide">

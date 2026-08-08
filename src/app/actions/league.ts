@@ -19,6 +19,7 @@ import {
   draftedPlayerIds,
   generateInviteCode,
   getLeaguePayroll,
+  progressLeague,
   simulateNextDay,
   simulateScheduledGame,
   startSeason,
@@ -369,9 +370,12 @@ export async function simDayAction(leagueId: string): Promise<ActionState> {
   const user = await mustUser();
   const gate = await assertLeagueMember(leagueId, user.id);
   if ("error" in gate && gate.error) return { error: gate.error };
-  if (gate.league!.status !== "season") return { error: "Season not running" };
+  const status = gate.league!.status;
+  if (status !== "season" && status !== "playoffs") {
+    return { error: "Season not running" };
+  }
 
-  await runCpuFrontOffice(leagueId);
+  if (status === "season") await runCpuFrontOffice(leagueId);
   await simulateNextDay(leagueId);
   revalidatePath(`/league/${leagueId}`);
   revalidatePath(`/league/${leagueId}/standings`);
@@ -406,10 +410,14 @@ export async function simWeekAction(leagueId: string): Promise<ActionState> {
   const user = await mustUser();
   const gate = await assertLeagueMember(leagueId, user.id);
   if ("error" in gate && gate.error) return { error: gate.error };
-  if (gate.league!.status !== "season") return { error: "Season not running" };
+  const wkStatus = gate.league!.status;
+  if (wkStatus !== "season" && wkStatus !== "playoffs") {
+    return { error: "Season not running" };
+  }
 
   for (let i = 0; i < 7; i++) {
-    await runCpuFrontOffice(leagueId);
+    const cur = await prisma.league.findUnique({ where: { id: leagueId } });
+    if (cur?.status === "season") await runCpuFrontOffice(leagueId);
     const res = await simulateNextDay(leagueId);
     if (!res.simulated) break;
   }
@@ -436,6 +444,7 @@ export async function simGameAction(
   }
 
   await simulateScheduledGame(gameId);
+  await progressLeague(leagueId);
   revalidatePath(`/league/${leagueId}`);
   revalidatePath(`/league/${leagueId}/game/${gameId}`);
   return { ok: true };

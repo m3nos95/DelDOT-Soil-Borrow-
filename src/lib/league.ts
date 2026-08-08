@@ -321,84 +321,109 @@ export async function simulateScheduledGame(gameId: string) {
       game.awayTeamId.charCodeAt(0) * 13,
   });
 
-  await prisma.$transaction([
-    prisma.game.update({
-      where: { id: gameId },
-      data: {
-        status: "final",
-        homeScore: result.homeScore,
-        awayScore: result.awayScore,
-        innings: JSON.stringify(result.innings),
-        playByPlay: JSON.stringify(result.playByPlay),
-        boxScore: JSON.stringify({
-          home: result.homeBox,
-          away: result.awayBox,
-        }),
-        homePitcher: result.homePitcher,
-        awayPitcher: result.awayPitcher,
-        playedAt: new Date(),
-      },
-    }),
-    prisma.team.update({
-      where: { id: game.homeTeamId },
-      data: {
-        wins: { increment: result.homeScore > result.awayScore ? 1 : 0 },
-        losses: { increment: result.homeScore < result.awayScore ? 1 : 0 },
-        runsFor: { increment: result.homeScore },
-        runsAgainst: { increment: result.awayScore },
-        errors: { increment: result.homeErrors },
-      },
-    }),
-    prisma.team.update({
-      where: { id: game.awayTeamId },
-      data: {
-        wins: { increment: result.awayScore > result.homeScore ? 1 : 0 },
-        losses: { increment: result.awayScore < result.homeScore ? 1 : 0 },
-        runsFor: { increment: result.awayScore },
-        runsAgainst: { increment: result.homeScore },
-        errors: { increment: result.awayErrors },
-      },
-    }),
-  ]);
+  const isRegularSeason = game.round === "";
 
-  await applyBoxToSeasonStats({
-    leagueId: game.leagueId,
-    teamId: game.homeTeamId,
-    batters: result.homeBox.batters,
-    pitchers: result.homeBox.pitchers,
-    starterPlayerId: home.pitcher.id,
-  });
-  await applyBoxToSeasonStats({
-    leagueId: game.leagueId,
-    teamId: game.awayTeamId,
-    batters: result.awayBox.batters,
-    pitchers: result.awayBox.pitchers,
-    starterPlayerId: away.pitcher.id,
-  });
-  await applyFieldingToSeasonStats({
-    leagueId: game.leagueId,
-    teamId: game.homeTeamId,
-    fielding: result.homeFielding,
-  });
-  await applyFieldingToSeasonStats({
-    leagueId: game.leagueId,
-    teamId: game.awayTeamId,
-    fielding: result.awayFielding,
+  await prisma.game.update({
+    where: { id: gameId },
+    data: {
+      status: "final",
+      homeScore: result.homeScore,
+      awayScore: result.awayScore,
+      innings: JSON.stringify(result.innings),
+      playByPlay: JSON.stringify(result.playByPlay),
+      boxScore: JSON.stringify({
+        home: result.homeBox,
+        away: result.awayBox,
+      }),
+      homePitcher: result.homePitcher,
+      awayPitcher: result.awayPitcher,
+      playedAt: new Date(),
+    },
   });
 
-  const leagueGames = await prisma.game.count({
-    where: { leagueId: game.leagueId, status: "scheduled" },
-  });
-  if (leagueGames === 0) {
-    await prisma.league.update({
-      where: { id: game.leagueId },
-      data: { status: "complete" },
+  // Only regular-season games shape standings + season stat lines
+  if (isRegularSeason) {
+    await prisma.$transaction([
+      prisma.team.update({
+        where: { id: game.homeTeamId },
+        data: {
+          wins: { increment: result.homeScore > result.awayScore ? 1 : 0 },
+          losses: { increment: result.homeScore < result.awayScore ? 1 : 0 },
+          runsFor: { increment: result.homeScore },
+          runsAgainst: { increment: result.awayScore },
+          errors: { increment: result.homeErrors },
+        },
+      }),
+      prisma.team.update({
+        where: { id: game.awayTeamId },
+        data: {
+          wins: { increment: result.awayScore > result.homeScore ? 1 : 0 },
+          losses: { increment: result.awayScore < result.homeScore ? 1 : 0 },
+          runsFor: { increment: result.awayScore },
+          runsAgainst: { increment: result.homeScore },
+          errors: { increment: result.awayErrors },
+        },
+      }),
+    ]);
+
+    await applyBoxToSeasonStats({
+      leagueId: game.leagueId,
+      teamId: game.homeTeamId,
+      batters: result.homeBox.batters,
+      pitchers: result.homeBox.pitchers,
+      starterPlayerId: home.pitcher.id,
     });
-    const { computeAndSaveAwards } = await import("./awards");
-    await computeAndSaveAwards(game.leagueId, { finalized: true });
+    await applyBoxToSeasonStats({
+      leagueId: game.leagueId,
+      teamId: game.awayTeamId,
+      batters: result.awayBox.batters,
+      pitchers: result.awayBox.pitchers,
+      starterPlayerId: away.pitcher.id,
+    });
+    await applyFieldingToSeasonStats({
+      leagueId: game.leagueId,
+      teamId: game.homeTeamId,
+      fielding: result.homeFielding,
+    });
+    await applyFieldingToSeasonStats({
+      leagueId: game.leagueId,
+      teamId: game.awayTeamId,
+      fielding: result.awayFielding,
+    });
   }
 
   return prisma.game.findUnique({ where: { id: gameId } });
+}
+
+/**
+ * Handle season → playoffs → complete transitions once a day has no more
+ * scheduled games. Finalizes awards at the end of the regular season and
+ * crowns a champion when the postseason ends.
+ */
+export async function progressLeague(leagueId: string) {
+  const remaining = await prisma.game.count({
+    where: { leagueId, status: "scheduled" },
+  });
+  if (remaining > 0) return;
+
+  const league = await prisma.league.findUnique({ where: { id: leagueId } });
+  if (!league) return;
+
+  if (league.status === "season") {
+    const { computeAndSaveAwards } = await import("./awards");
+    await computeAndSaveAwards(leagueId, { finalized: true });
+    const { startPlayoffs } = await import("./playoffs");
+    const started = await startPlayoffs(leagueId);
+    if (!started) {
+      await prisma.league.update({
+        where: { id: leagueId },
+        data: { status: "complete" },
+      });
+    }
+  } else if (league.status === "playoffs") {
+    const { advancePlayoffs } = await import("./playoffs");
+    await advancePlayoffs(leagueId);
+  }
 }
 
 export async function simulateNextDay(leagueId: string) {
@@ -415,6 +440,7 @@ export async function simulateNextDay(leagueId: string) {
   for (const g of games) {
     await simulateScheduledGame(g.id);
   }
+  await progressLeague(leagueId);
   return { simulated: games.length, dayNumber };
 }
 

@@ -627,6 +627,118 @@ select.field-input option {
   font-variant-numeric: tabular-nums;
 }
 
+/* Playoffs bracket */
+.champ-banner {
+  border: 1px solid rgba(232, 184, 74, 0.4);
+  background:
+    radial-gradient(ellipse 70% 120% at 50% -20%, rgba(232, 184, 74, 0.18), transparent 60%),
+    linear-gradient(180deg, rgba(30, 24, 8, 0.6), rgba(10, 20, 16, 0.9));
+  padding: 1.75rem 1.5rem;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(232, 184, 74, 0.14);
+}
+.champ-kick {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--foul);
+}
+.champ-name {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(2.6rem, 7vw, 4rem);
+  line-height: 0.95;
+  letter-spacing: 0.03em;
+  color: #fff6c8;
+  text-shadow: 0 0 30px rgba(232, 184, 74, 0.3);
+}
+.champ-sub {
+  margin: 0.6rem 0 0;
+  color: var(--fog);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8rem;
+}
+
+.bracket {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 720px) {
+  .bracket {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(220px, 1fr);
+    align-items: start;
+    overflow-x: auto;
+  }
+}
+.bracket-round-title {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--foul);
+}
+.bracket-series {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(18, 32, 44, 0.9), rgba(10, 20, 28, 0.96));
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 1rem;
+}
+.bracket-team {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0;
+  color: var(--fog);
+}
+.bracket-team.win {
+  color: var(--chalk);
+}
+.bracket-seed {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--fog);
+  width: 1.1rem;
+}
+.bracket-team-name {
+  flex: 1;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: 0.03em;
+}
+.bracket-team.win .bracket-wins {
+  color: var(--foul);
+}
+.bracket-meta {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fog);
+}
+.bracket-games {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.bracket-game {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--fog);
+  transition: color 140ms var(--ease);
+}
+.bracket-game:hover {
+  color: var(--foul);
+}
+
 /* Live daily slate */
 .live-grid {
   display: grid;

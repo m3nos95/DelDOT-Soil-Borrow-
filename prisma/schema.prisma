@@ -68,9 +68,13 @@ model League {
   gamesPerTeam    Int      @default(162)
   /// Dynasty era lock: pre1950 | classic | freeagent | modern | open
   era             String   @default("modern")
-  status          String   @default("forming") // forming | drafting | season | complete
+  status          String   @default("forming") // forming | drafting | season | playoffs | complete
   /// When true, a scheduled job advances one game-day per real day (MLB-like cadence)
   autoAdvance     Boolean  @default(false)
+  /// Increments each finished season for dynasty history
+  seasonNumber    Int      @default(1)
+  playoffSeries   PlayoffSeries[]
+  champions       Champion[]
   commissionerId  String
   commissioner    User     @relation("LeagueCommissioner", fields: [commissionerId], references: [id])
   createdAt       DateTime @default(now())
@@ -163,6 +167,9 @@ model Game {
   awayTeam     Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
   dayNumber    Int
   status       String   @default("scheduled") // scheduled | final
+  /// "" for regular season, else playoff round label (e.g. "Semifinal")
+  round        String   @default("")
+  seriesId     String?
   homeScore    Int      @default(0)
   awayScore    Int      @default(0)
   innings      String   @default("[]") // JSON inning scores
@@ -232,6 +239,46 @@ model SeasonPitchingStat {
   @@unique([leagueId, teamId, playerId])
   @@index([leagueId, so])
   @@index([leagueId, w])
+}
+
+/// A postseason best-of-N matchup
+model PlayoffSeries {
+  id            String  @id @default(cuid())
+  leagueId      String
+  league        League  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  /// Round label: Quarterfinal | Semifinal | Final
+  round         String
+  /// Round index (0 = first round) and slot within the round
+  roundIndex    Int
+  slot          Int
+  highSeedTeamId String
+  lowSeedTeamId  String
+  highSeed      Int
+  lowSeed       Int
+  highWins      Int     @default(0)
+  lowWins       Int     @default(0)
+  bestOf        Int     @default(7)
+  winnerTeamId  String?
+  done          Boolean @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([leagueId, roundIndex])
+}
+
+/// Season champions for dynasty history
+model Champion {
+  id            String   @id @default(cuid())
+  leagueId      String
+  league        League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  seasonNumber  Int
+  teamId        String
+  teamName      String
+  teamAbbr      String
+  runnerUpName  String   @default("")
+  note          String   @default("")
+  createdAt     DateTime @default(now())
+
+  @@index([leagueId, seasonNumber])
 }
 
 /// Accumulated fielding for a player on a team this season (errors by position)

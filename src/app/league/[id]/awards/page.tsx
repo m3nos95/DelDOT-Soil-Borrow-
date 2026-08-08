@@ -102,7 +102,11 @@ export default async function AwardsPage({
     include: { teams: true },
   });
   if (!league) notFound();
-  if (league.status !== "season" && league.status !== "complete") {
+  if (
+    league.status !== "season" &&
+    league.status !== "playoffs" &&
+    league.status !== "complete"
+  ) {
     redirect(`/league/${id}`);
   }
 

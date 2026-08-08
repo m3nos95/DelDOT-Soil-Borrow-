@@ -89,7 +89,11 @@ export default async function LivePage({
     include: { teams: true },
   });
   if (!league) notFound();
-  if (league.status !== "season" && league.status !== "complete") {
+  if (
+    league.status !== "season" &&
+    league.status !== "playoffs" &&
+    league.status !== "complete"
+  ) {
     redirect(`/league/${id}`);
   }
   const isCommissioner = league.commissionerId === session.id;

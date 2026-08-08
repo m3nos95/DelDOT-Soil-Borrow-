@@ -13,7 +13,12 @@ const LINKS = [
   {
     href: "/live",
     label: "Live",
-    statuses: ["season", "complete"],
+    statuses: ["season", "playoffs", "complete"],
+  },
+  {
+    href: "/playoffs",
+    label: "Playoffs",
+    statuses: ["playoffs", "complete"],
   },
   {
     href: "/free-agency",
@@ -21,21 +26,25 @@ const LINKS = [
     statuses: ["season"],
   },
   { href: "/trades", label: "Trades", statuses: ["season", "drafting"] },
-  { href: "/team", label: "Lineup", statuses: ["drafting", "season", "complete"] },
+  {
+    href: "/team",
+    label: "Lineup",
+    statuses: ["drafting", "season", "playoffs", "complete"],
+  },
   {
     href: "/standings",
     label: "Standings",
-    statuses: ["season", "complete"],
+    statuses: ["season", "playoffs", "complete"],
   },
   {
     href: "/stats",
     label: "Stats",
-    statuses: ["season", "complete"],
+    statuses: ["season", "playoffs", "complete"],
   },
   {
     href: "/awards",
     label: "Awards",
-    statuses: ["season", "complete"],
+    statuses: ["season", "playoffs", "complete"],
   },
 ] as const;
 

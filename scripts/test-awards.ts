@@ -333,13 +333,23 @@ async function integration() {
   await fillCpuTeams(league.id);
   await startSeason(league.id);
 
-  // Play full short season
-  await simulateDays(league.id, 40);
+  // Play the regular season and the full postseason
+  for (let i = 0; i < 60; i++) {
+    const res = await simulateDays(league.id, 5);
+    const l = await prisma.league.findUniqueOrThrow({ where: { id: league.id } });
+    if (l.status === "complete") break;
+    if (!res.simulated) break;
+  }
 
   const refreshed = await prisma.league.findUniqueOrThrow({
     where: { id: league.id },
   });
-  assert.equal(refreshed.status, "complete", "season should complete");
+  assert.equal(refreshed.status, "complete", "season + playoffs should finish");
+
+  const champion = await prisma.champion.findFirst({
+    where: { leagueId: league.id },
+  });
+  assert.ok(champion, "a champion should be crowned");
 
   let awards = await prisma.seasonAward.findMany({
     where: { leagueId: league.id },
@@ -369,7 +379,7 @@ async function integration() {
   );
 
   console.log(
-    `integration awards: ${awards.length} trophies · MVP/CY/GG/SS ok`,
+    `integration awards: ${awards.length} trophies · MVP/CY/GG/SS ok · champion ${champion!.teamName}`,
   );
   await prisma.$disconnect();
 }
