@@ -233,18 +233,27 @@ def clamp(n: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, n))
 
 
-def salary_from_war(war: float, is_pitcher: bool) -> int:
-    """Map career WAR to a draft salary. Floor $500k, ceiling ~$32M."""
-    # Soften extreme WAR so Ruth/Young don't make the pool undraftable alone
-    effective = max(0.0, war)
-    # Diminishing returns above 80 WAR
-    if effective > 80:
-        effective = 80 + (effective - 80) * 0.45
+def salary_from_value(war: float, playing_time: float, is_pitcher: bool) -> int:
+    """Blend PEAK RATE (WAR per full season) with CAREER BULK.
+
+    Career-total WAR alone overpays compilers (Harold Baines) and underpays
+    high-peak/short-career bats (Travis Hafner). We add a per-season rate term
+    so peak quality matters, while bulk still rewards longevity.
+
+    playing_time is PA for hitters, IP for pitchers.
+    Floor $500k, ceiling ~$32M.
+    """
+    war = max(-2.0, war)
     if is_pitcher:
-        raw = 500_000 + effective * 280_000
+        full = max(playing_time, 1.0) / 200.0  # ~200 IP season
+        per_season = clamp(war / full, -1.0, 8.0)
+        bulk = war if war <= 80 else 80 + (war - 80) * 0.45
+        raw = 500_000 + per_season * 2_300_000 + max(0.0, bulk) * 120_000
     else:
-        raw = 500_000 + effective * 300_000
-    # Small playing-time bump already baked into WAR; keep round millions-ish
+        full = max(playing_time, 1.0) / 650.0  # ~650 PA season
+        per_season = clamp(war / full, -1.0, 9.0)
+        bulk = war if war <= 80 else 80 + (war - 80) * 0.45
+        raw = 500_000 + per_season * 2_200_000 + max(0.0, bulk) * 130_000
     salary = int(round(raw / 100_000) * 100_000)
     return int(clamp(salary, 500_000, 32_000_000))
 
@@ -291,7 +300,7 @@ def batter_card(pid: int, b: dict) -> dict:
         "positions": positions,
         "bats": b["bats"] or "R",
         "throws": "R",
-        "salary": salary_from_war(war, is_pitcher=False),
+        "salary": salary_from_value(war, pa, is_pitcher=False),
         "isPitcher": False,
         "kRate": round(1000.0 * b["so"] / pa, 2),
         "bbRate": round(1000.0 * b["bb"] / pa, 2),
@@ -335,7 +344,7 @@ def pitcher_card(pid: int, p: dict) -> dict:
         "positions": ["P"],
         "bats": "R",
         "throws": p["throws"] or "R",
-        "salary": salary_from_war(war, is_pitcher=True),
+        "salary": salary_from_value(war, ip, is_pitcher=True),
         "isPitcher": True,
         "kRate": round(1000.0 * p["so"] / tbf, 2),
         "bbRate": round(1000.0 * p["bb"] / tbf, 2),

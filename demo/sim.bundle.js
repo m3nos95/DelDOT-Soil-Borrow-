@@ -396,7 +396,11 @@ var HardballSim = (() => {
       bb: 0,
       so: 0,
       hr: 0,
-      sb: 0
+      sb: 0,
+      doubles: 0,
+      triples: 0,
+      hbp: 0,
+      sf: 0
     };
   }
   function emptyPitcher(p) {
@@ -410,7 +414,10 @@ var HardballSim = (() => {
       bb: 0,
       so: 0,
       hr: 0,
-      decision: ""
+      decision: "",
+      qs: 0,
+      cg: 0,
+      sho: 0
     };
   }
   function batterHandVs(batter, pitcher) {
@@ -864,6 +871,8 @@ var HardballSim = (() => {
           if (outcome === "BB") {
             box.bb += 1;
             arm.box.bb += 1;
+          } else {
+            box.hbp += 1;
           }
           const label = outcome === "BB" ? "walks" : "is hit by a pitch";
           if (bases[0] && bases[1] && bases[2]) {
@@ -892,7 +901,6 @@ var HardballSim = (() => {
           }
         } else if (outcome === "OUT") {
           outs += 1;
-          box.ab += 1;
           arm.box.ip += 1 / 3;
           arm.outsRecorded += 1;
           const kind = ["grounds out", "flies out", "lines out"][Math.floor(rand() * 3)];
@@ -901,7 +909,9 @@ var HardballSim = (() => {
             0.15,
             0.7
           );
-          if (bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25) {
+          const isSacFly = !!bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25;
+          if (isSacFly) {
+            box.sf += 1;
             creditRun(bases[2].player, true);
             bases[2] = null;
             log(
@@ -911,6 +921,7 @@ var HardballSim = (() => {
               pa_
             );
           } else {
+            box.ab += 1;
             log(half, `${batter.name} ${kind}.`, { outs, bases }, pa_);
           }
         } else {
@@ -918,7 +929,9 @@ var HardballSim = (() => {
           box.ab += 1;
           box.h += 1;
           arm.box.h += 1;
-          if (outcome === "HR") {
+          if (outcome === "2B") box.doubles += 1;
+          else if (outcome === "3B") box.triples += 1;
+          else if (outcome === "HR") {
             box.hr += 1;
             arm.box.hr += 1;
           }
@@ -979,6 +992,16 @@ var HardballSim = (() => {
     };
     homePitcherBoxes.forEach(roundIp);
     awayPitcherBoxes.forEach(roundIp);
+    const markStaffMilestones = (boxes) => {
+      const sp = boxes[0];
+      if (sp && sp.ip >= 5.999 && sp.er <= 3) sp.qs = 1;
+      if (boxes.length === 1 && sp) {
+        sp.cg = 1;
+        if (sp.r === 0) sp.sho = 1;
+      }
+    };
+    markStaffMilestones(homePitcherBoxes);
+    markStaffMilestones(awayPitcherBoxes);
     return {
       homeScore,
       awayScore,
