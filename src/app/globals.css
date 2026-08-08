@@ -356,10 +356,25 @@ select.field-input option {
 
 .league-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.15rem 1.35rem;
   border-bottom: 1px solid var(--line);
   margin-bottom: 2rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.league-tabs::-webkit-scrollbar {
+  display: none;
+}
+.league-tab {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+@media (min-width: 900px) {
+  .league-tabs {
+    flex-wrap: wrap;
+  }
 }
 
 .league-tab {
@@ -1014,17 +1029,13 @@ select.field-input option {
 
 .gc-hud {
   display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.65rem;
   background: #080e14;
   border: 3px solid #4a3a18;
   padding: 0.55rem 0.7rem;
-}
-@media (min-width: 640px) {
-  .gc-hud {
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-  }
 }
 .gc-root.bit64 .gc-hud {
   border-width: 1px;
