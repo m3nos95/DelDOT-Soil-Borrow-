@@ -10,7 +10,8 @@ import { deriveDefense } from "./sim";
 import {
   battingAverage,
   earnedRunAvg,
-  onBasePct,
+  onBasePctFull,
+  sluggingPct,
   whip,
 } from "./stats";
 
@@ -102,6 +103,10 @@ type BatRow = {
   so: number;
   hr: number;
   sb: number;
+  doubles: number;
+  triples: number;
+  hbp: number;
+  sf: number;
   player: {
     id: string;
     name: string;
@@ -140,19 +145,25 @@ type PitchRow = {
   team: { id: string; abbreviation: string; wins: number; losses: number };
 };
 
+function obpOf(s: BatRow) {
+  return onBasePctFull(s.ab, s.h, s.bb, s.hbp, s.sf);
+}
+function slgOf(s: BatRow) {
+  return sluggingPct(s.ab, s.h, s.doubles, s.triples, s.hr);
+}
+
 function battingScore(s: BatRow): number {
-  const avg = battingAverage(s.ab, s.h);
-  const obp = onBasePct(s.ab, s.h, s.bb);
-  const pa = s.ab + s.bb;
-  const rateBoost = pa > 0 ? (avg * 80 + obp * 95) * (pa / 500) : 0;
+  const obp = obpOf(s);
+  const slg = slgOf(s);
+  const pa = s.ab + s.bb + s.hbp + s.sf;
+  // OPS carries the rate signal now that we have real total bases
+  const rateBoost = pa > 0 ? (obp + slg) * 120 * (pa / 550) : 0;
   const teamBoost = s.team.wins * 0.55;
   return (
-    s.r * 2.4 +
-    s.hr * 4.0 +
-    s.rbi * 2.3 +
-    s.bb * 1.15 +
-    s.sb * 1.5 +
-    s.h * 0.45 +
+    s.r * 2.2 +
+    s.hr * 3.6 +
+    s.rbi * 2.1 +
+    s.sb * 1.4 +
     rateBoost +
     teamBoost
   );
@@ -178,17 +189,15 @@ function cyYoungScore(s: PitchRow): number {
 }
 
 function silverSluggerScore(s: BatRow): number {
-  const avg = battingAverage(s.ab, s.h);
-  const obp = onBasePct(s.ab, s.h, s.bb);
+  // Silver Slugger is a bat award — weight OPS + power heavily
+  const ops = obpOf(s) + slgOf(s);
   return (
-    s.hr * 4.2 +
-    s.rbi * 1.6 +
-    s.r * 1.1 +
-    s.h * 0.45 +
-    s.bb * 0.7 +
-    s.sb * 0.6 +
-    avg * 220 +
-    obp * 160
+    s.hr * 3.8 +
+    s.rbi * 1.5 +
+    s.r * 1.0 +
+    s.doubles * 0.8 +
+    s.triples * 1.0 +
+    ops * 260
   );
 }
 
@@ -214,7 +223,8 @@ function goldGloveScore(
 
 function batNote(s: BatRow): string {
   const avg = battingAverage(s.ab, s.h);
-  return `${s.hr} HR · ${s.rbi} RBI · ${fmtAvg(avg)} AVG · ${s.team.wins}-${s.team.losses}`;
+  const ops = obpOf(s) + slgOf(s);
+  return `${s.hr} HR · ${s.rbi} RBI · ${fmtAvg(avg)} AVG · ${ops.toFixed(3).replace(/^0/, "")} OPS`;
 }
 
 function cyNote(s: PitchRow): string {
@@ -225,8 +235,8 @@ function cyNote(s: PitchRow): string {
 
 function ssNote(s: BatRow): string {
   const avg = battingAverage(s.ab, s.h);
-  const obp = onBasePct(s.ab, s.h, s.bb);
-  return `${fmtAvg(avg)} / ${fmtAvg(obp)} · ${s.hr} HR · ${s.rbi} RBI`;
+  const slg = slgOf(s);
+  return `${fmtAvg(avg)} AVG · ${fmtAvg(slg)} SLG · ${s.hr} HR · ${s.rbi} RBI`;
 }
 
 function ggNote(s: BatRow | PitchRow, pos: string): string {
@@ -464,6 +474,10 @@ async function loadAwardInputs(leagueId: string) {
     so: s.so,
     hr: s.hr,
     sb: s.sb,
+    doubles: s.doubles,
+    triples: s.triples,
+    hbp: s.hbp,
+    sf: s.sf,
     player: s.player,
     team: s.team,
     fieldPos:

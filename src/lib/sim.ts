@@ -115,6 +115,10 @@ export type BatterBox = {
   so: number;
   hr: number;
   sb: number;
+  doubles: number;
+  triples: number;
+  hbp: number;
+  sf: number;
 };
 
 export type PitcherBox = {
@@ -128,6 +132,12 @@ export type PitcherBox = {
   so: number;
   hr: number;
   decision: "" | "W" | "L" | "S" | "H";
+  /** Quality start (starter, 6+ IP, ≤3 ER) */
+  qs: number;
+  /** Complete game */
+  cg: number;
+  /** Shutout (complete game, 0 runs) */
+  sho: number;
 };
 
 export type GameResult = {
@@ -394,6 +404,10 @@ function emptyBatter(p: SimPlayer): BatterBox {
     so: 0,
     hr: 0,
     sb: 0,
+    doubles: 0,
+    triples: 0,
+    hbp: 0,
+    sf: 0,
   };
 }
 
@@ -409,6 +423,9 @@ function emptyPitcher(p: SimPlayer): PitcherBox {
     so: 0,
     hr: 0,
     decision: "",
+    qs: 0,
+    cg: 0,
+    sho: 0,
   };
 }
 
@@ -1077,6 +1094,8 @@ export function simulateGame(opts: {
         if (outcome === "BB") {
           box.bb += 1;
           arm.box.bb += 1;
+        } else {
+          box.hbp += 1;
         }
         const label = outcome === "BB" ? "walks" : "is hit by a pitch";
         if (bases[0] && bases[1] && bases[2]) {
@@ -1105,7 +1124,6 @@ export function simulateGame(opts: {
         }
       } else if (outcome === "OUT") {
         outs += 1;
-        box.ab += 1;
         arm.box.ip += 1 / 3;
         arm.outsRecorded += 1;
         const kind = ["grounds out", "flies out", "lines out"][
@@ -1117,7 +1135,10 @@ export function simulateGame(opts: {
           0.15,
           0.7,
         );
-        if (bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25) {
+        const isSacFly = !!bases[2] && outs < 3 && rand() < 0.22 + contactSkill * 0.25;
+        if (isSacFly) {
+          // Sacrifice fly: not an at-bat, RBI credited
+          box.sf += 1;
           creditRun(bases[2]!.player, true);
           bases[2] = null;
           log(
@@ -1127,6 +1148,7 @@ export function simulateGame(opts: {
             pa_,
           );
         } else {
+          box.ab += 1;
           log(half, `${batter.name} ${kind}.`, { outs, bases }, pa_);
         }
       } else {
@@ -1135,7 +1157,9 @@ export function simulateGame(opts: {
         box.ab += 1;
         box.h += 1;
         arm.box.h += 1;
-        if (outcome === "HR") {
+        if (outcome === "2B") box.doubles += 1;
+        else if (outcome === "3B") box.triples += 1;
+        else if (outcome === "HR") {
           box.hr += 1;
           arm.box.hr += 1;
         }
@@ -1221,6 +1245,19 @@ export function simulateGame(opts: {
   };
   homePitcherBoxes.forEach(roundIp);
   awayPitcherBoxes.forEach(roundIp);
+
+  // Quality starts, complete games, shutouts
+  const markStaffMilestones = (boxes: PitcherBox[]) => {
+    const sp = boxes[0];
+    if (sp && sp.ip >= 5.999 && sp.er <= 3) sp.qs = 1;
+    if (boxes.length === 1 && sp) {
+      // One pitcher covered the whole game for this team
+      sp.cg = 1;
+      if (sp.r === 0) sp.sho = 1;
+    }
+  };
+  markStaffMilestones(homePitcherBoxes);
+  markStaffMilestones(awayPitcherBoxes);
 
   return {
     homeScore,

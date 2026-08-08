@@ -159,6 +159,8 @@ function BoxTable({
             <th className="px-1 font-normal">AB</th>
             <th className="px-1 font-normal">R</th>
             <th className="px-1 font-normal">H</th>
+            <th className="px-1 font-normal">2B</th>
+            <th className="px-1 font-normal">3B</th>
             <th className="px-1 font-normal">RBI</th>
             <th className="px-1 font-normal">BB</th>
             <th className="px-1 font-normal">SO</th>
@@ -173,6 +175,8 @@ function BoxTable({
               <td className="stat-mono px-1">{b.ab}</td>
               <td className="stat-mono px-1">{b.r}</td>
               <td className="stat-mono px-1">{b.h}</td>
+              <td className="stat-mono px-1">{b.doubles ?? 0}</td>
+              <td className="stat-mono px-1">{b.triples ?? 0}</td>
               <td className="stat-mono px-1">{b.rbi}</td>
               <td className="stat-mono px-1">{b.bb}</td>
               <td className="stat-mono px-1">{b.so}</td>

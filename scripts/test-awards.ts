@@ -27,6 +27,10 @@ function bat(
     so: number;
     hr: number;
     sb: number;
+    doubles: number;
+    triples: number;
+    hbp: number;
+    sf: number;
     name: string;
     primaryPos: string;
     goldGloves: number;
@@ -51,6 +55,10 @@ function bat(
     so: overrides.so ?? 100,
     hr: overrides.hr ?? 25,
     sb: overrides.sb ?? 10,
+    doubles: overrides.doubles ?? 28,
+    triples: overrides.triples ?? 2,
+    hbp: overrides.hbp ?? 5,
+    sf: overrides.sf ?? 5,
     player: {
       id: playerId,
       name: overrides.name ?? "Hitter",

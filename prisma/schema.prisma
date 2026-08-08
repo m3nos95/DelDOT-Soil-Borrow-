@@ -188,6 +188,10 @@ model SeasonBattingStat {
   so       Int    @default(0)
   hr       Int    @default(0)
   sb       Int    @default(0)
+  doubles  Int    @default(0)
+  triples  Int    @default(0)
+  hbp      Int    @default(0)
+  sf       Int    @default(0)
 
   @@unique([leagueId, teamId, playerId])
   @@index([leagueId, hr])
@@ -217,6 +221,9 @@ model SeasonPitchingStat {
   l        Int    @default(0)
   sv       Int    @default(0)
   hld      Int    @default(0)
+  qs       Int    @default(0)
+  cg       Int    @default(0)
+  sho      Int    @default(0)
 
   @@unique([leagueId, teamId, playerId])
   @@index([leagueId, so])

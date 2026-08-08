@@ -7,9 +7,13 @@ import { formatIp } from "@/lib/sim";
 import {
   battingAverage,
   earnedRunAvg,
-  onBasePct,
+  onBasePctFull,
+  per9,
+  sluggingPct,
   whip,
 } from "@/lib/stats";
+
+const fmt3 = (n: number) => n.toFixed(3).replace(/^0/, "");
 
 export default async function StatsPage({
   params,
@@ -98,8 +102,12 @@ export default async function StatsPage({
                   <th>BB</th>
                   <th>SO</th>
                   <th>SB</th>
+                  <th>2B</th>
+                  <th>3B</th>
                   <th>AVG</th>
                   <th>OBP</th>
+                  <th>SLG</th>
+                  <th>OPS</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,11 +128,22 @@ export default async function StatsPage({
                     <td className="stat-mono text-sm">{s.bb}</td>
                     <td className="stat-mono text-sm">{s.so}</td>
                     <td className="stat-mono text-sm">{s.sb}</td>
+                    <td className="stat-mono text-sm">{s.doubles}</td>
+                    <td className="stat-mono text-sm">{s.triples}</td>
                     <td className="stat-mono text-sm">
-                      {battingAverage(s.ab, s.h).toFixed(3).replace(/^0/, "")}
+                      {fmt3(battingAverage(s.ab, s.h))}
                     </td>
                     <td className="stat-mono text-sm">
-                      {onBasePct(s.ab, s.h, s.bb).toFixed(3).replace(/^0/, "")}
+                      {fmt3(onBasePctFull(s.ab, s.h, s.bb, s.hbp, s.sf))}
+                    </td>
+                    <td className="stat-mono text-sm">
+                      {fmt3(sluggingPct(s.ab, s.h, s.doubles, s.triples, s.hr))}
+                    </td>
+                    <td className="stat-mono text-sm">
+                      {fmt3(
+                        onBasePctFull(s.ab, s.h, s.bb, s.hbp, s.sf) +
+                          sluggingPct(s.ab, s.h, s.doubles, s.triples, s.hr),
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -143,13 +162,14 @@ export default async function StatsPage({
                   <th>W</th>
                   <th>L</th>
                   <th>SV</th>
+                  <th>QS</th>
+                  <th>CG</th>
                   <th>IP</th>
-                  <th>H</th>
-                  <th>ER</th>
-                  <th>BB</th>
                   <th>SO</th>
+                  <th>BB</th>
                   <th>ERA</th>
                   <th>WHIP</th>
+                  <th>K/9</th>
                 </tr>
               </thead>
               <tbody>
@@ -166,18 +186,21 @@ export default async function StatsPage({
                     <td className="stat-mono text-sm">{s.w}</td>
                     <td className="stat-mono text-sm">{s.l}</td>
                     <td className="stat-mono text-sm">{s.sv}</td>
+                    <td className="stat-mono text-sm">{s.qs}</td>
+                    <td className="stat-mono text-sm">{s.cg}</td>
                     <td className="stat-mono text-sm">
                       {formatIp(s.outs / 3)}
                     </td>
-                    <td className="stat-mono text-sm">{s.h}</td>
-                    <td className="stat-mono text-sm">{s.er}</td>
-                    <td className="stat-mono text-sm">{s.bb}</td>
                     <td className="stat-mono text-sm">{s.so}</td>
+                    <td className="stat-mono text-sm">{s.bb}</td>
                     <td className="stat-mono text-sm">
                       {earnedRunAvg(s.er, s.outs).toFixed(2)}
                     </td>
                     <td className="stat-mono text-sm">
                       {whip(s.h, s.bb, s.outs).toFixed(2)}
+                    </td>
+                    <td className="stat-mono text-sm">
+                      {per9(s.so, s.outs).toFixed(1)}
                     </td>
                   </tr>
                 ))}

@@ -39,6 +39,10 @@ export async function applyBoxToSeasonStats(opts: {
         so: b.so,
         hr: b.hr,
         sb: b.sb ?? 0,
+        doubles: b.doubles ?? 0,
+        triples: b.triples ?? 0,
+        hbp: b.hbp ?? 0,
+        sf: b.sf ?? 0,
       },
       update: {
         g: { increment: 1 },
@@ -50,6 +54,10 @@ export async function applyBoxToSeasonStats(opts: {
         so: { increment: b.so },
         hr: { increment: b.hr },
         sb: { increment: b.sb ?? 0 },
+        doubles: { increment: b.doubles ?? 0 },
+        triples: { increment: b.triples ?? 0 },
+        hbp: { increment: b.hbp ?? 0 },
+        sf: { increment: b.sf ?? 0 },
       },
     });
   }
@@ -80,6 +88,9 @@ export async function applyBoxToSeasonStats(opts: {
         l: p.decision === "L" ? 1 : 0,
         sv: p.decision === "S" ? 1 : 0,
         hld: p.decision === "H" ? 1 : 0,
+        qs: p.qs ?? 0,
+        cg: p.cg ?? 0,
+        sho: p.sho ?? 0,
       },
       update: {
         g: { increment: 1 },
@@ -95,6 +106,9 @@ export async function applyBoxToSeasonStats(opts: {
         l: { increment: p.decision === "L" ? 1 : 0 },
         sv: { increment: p.decision === "S" ? 1 : 0 },
         hld: { increment: p.decision === "H" ? 1 : 0 },
+        qs: { increment: p.qs ?? 0 },
+        cg: { increment: p.cg ?? 0 },
+        sho: { increment: p.sho ?? 0 },
       },
     });
   }
@@ -109,6 +123,49 @@ export function onBasePct(ab: number, h: number, bb: number) {
   const pa = ab + bb;
   if (pa <= 0) return 0;
   return (h + bb) / pa;
+}
+
+/** Full OBP including HBP and sac flies in the denominator. */
+export function onBasePctFull(
+  ab: number,
+  h: number,
+  bb: number,
+  hbp: number,
+  sf: number,
+) {
+  const denom = ab + bb + hbp + sf;
+  if (denom <= 0) return 0;
+  return (h + bb + hbp) / denom;
+}
+
+export function totalBases(
+  h: number,
+  doubles: number,
+  triples: number,
+  hr: number,
+) {
+  const singles = Math.max(0, h - doubles - triples - hr);
+  return singles + 2 * doubles + 3 * triples + 4 * hr;
+}
+
+export function sluggingPct(
+  ab: number,
+  h: number,
+  doubles: number,
+  triples: number,
+  hr: number,
+) {
+  if (ab <= 0) return 0;
+  return totalBases(h, doubles, triples, hr) / ab;
+}
+
+export function ops(obp: number, slg: number) {
+  return obp + slg;
+}
+
+export function per9(count: number, outs: number) {
+  if (outs <= 0) return 0;
+  return (count * 27) / outs;
 }
 
 export function earnedRunAvg(er: number, outs: number) {
