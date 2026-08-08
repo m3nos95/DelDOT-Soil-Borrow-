@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import type { BatterBox, PitcherBox } from "./sim";
+import type { BatterBox, FieldError, PitcherBox } from "./sim";
 
 function ipToOuts(ip: number) {
   const whole = Math.floor(ip + 1e-9);
@@ -110,6 +110,30 @@ export async function applyBoxToSeasonStats(opts: {
         cg: { increment: p.cg ?? 0 },
         sho: { increment: p.sho ?? 0 },
       },
+    });
+  }
+}
+
+export async function applyFieldingToSeasonStats(opts: {
+  leagueId: string;
+  teamId: string;
+  fielding: FieldError[];
+}) {
+  const { leagueId, teamId, fielding } = opts;
+  for (const f of fielding) {
+    if (!f.playerId || f.errors <= 0) continue;
+    await prisma.seasonFieldingStat.upsert({
+      where: {
+        leagueId_teamId_playerId: { leagueId, teamId, playerId: f.playerId },
+      },
+      create: {
+        leagueId,
+        teamId,
+        playerId: f.playerId,
+        pos: f.pos,
+        errors: f.errors,
+      },
+      update: { errors: { increment: f.errors } },
     });
   }
 }

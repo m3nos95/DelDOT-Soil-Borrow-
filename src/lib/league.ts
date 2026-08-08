@@ -7,7 +7,7 @@ import {
 } from "./environment";
 import type { Hand, SimPlayer, LineupEntry, StaffArm, BullpenRole } from "./sim";
 import { deriveDefense, deriveSpeed, simulateGame } from "./sim";
-import { applyBoxToSeasonStats } from "./stats";
+import { applyBoxToSeasonStats, applyFieldingToSeasonStats } from "./stats";
 
 export { PARKS } from "./constants";
 
@@ -346,6 +346,7 @@ export async function simulateScheduledGame(gameId: string) {
         losses: { increment: result.homeScore < result.awayScore ? 1 : 0 },
         runsFor: { increment: result.homeScore },
         runsAgainst: { increment: result.awayScore },
+        errors: { increment: result.homeErrors },
       },
     }),
     prisma.team.update({
@@ -355,6 +356,7 @@ export async function simulateScheduledGame(gameId: string) {
         losses: { increment: result.awayScore < result.homeScore ? 1 : 0 },
         runsFor: { increment: result.awayScore },
         runsAgainst: { increment: result.homeScore },
+        errors: { increment: result.awayErrors },
       },
     }),
   ]);
@@ -372,6 +374,16 @@ export async function simulateScheduledGame(gameId: string) {
     batters: result.awayBox.batters,
     pitchers: result.awayBox.pitchers,
     starterPlayerId: away.pitcher.id,
+  });
+  await applyFieldingToSeasonStats({
+    leagueId: game.leagueId,
+    teamId: game.homeTeamId,
+    fielding: result.homeFielding,
+  });
+  await applyFieldingToSeasonStats({
+    leagueId: game.leagueId,
+    teamId: game.awayTeamId,
+    fielding: result.awayFielding,
   });
 
   const leagueGames = await prisma.game.count({

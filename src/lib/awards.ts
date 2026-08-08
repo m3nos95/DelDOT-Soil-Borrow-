@@ -107,6 +107,7 @@ type BatRow = {
   triples: number;
   hbp: number;
   sf: number;
+  seasonErrors: number;
   player: {
     id: string;
     name: string;
@@ -134,6 +135,7 @@ type PitchRow = {
   w: number;
   l: number;
   sv: number;
+  seasonErrors: number;
   player: {
     id: string;
     name: string;
@@ -217,8 +219,11 @@ function goldGloveScore(
     "outs" in s
       ? Math.sqrt(Math.max(1, s.outs / 3))
       : Math.sqrt(Math.max(1, g));
+  // Real season errors now drive the award: fewer errors per game scores higher.
+  const errorRate = s.seasonErrors / Math.max(1, g);
+  const errorPenalty = errorRate * 420;
   // Season games matter most; career GG is a soft prior so Brooks isn't automatic every year
-  return defense * ipFactor + s.player.goldGloves * 0.35 + g * 0.2;
+  return defense * ipFactor + s.player.goldGloves * 0.35 + g * 0.2 - errorPenalty;
 }
 
 function batNote(s: BatRow): string {
@@ -241,18 +246,9 @@ function ssNote(s: BatRow): string {
 
 function ggNote(s: BatRow | PitchRow, pos: string): string {
   if ("outs" in s) {
-    return `${s.g} G · ${s.gs} GS · glove ${deriveDefense({
-      primaryPos: "P",
-      isPitcher: true,
-      careerWAR: s.player.careerWAR,
-      goldGloves: s.player.goldGloves,
-    }).toFixed(0)}`;
+    return `${s.g} G · ${s.gs} GS · ${s.seasonErrors} E`;
   }
-  return `${s.g} G · ${pos} · glove ${deriveDefense({
-    primaryPos: s.player.primaryPos,
-    careerWAR: s.player.careerWAR,
-    goldGloves: s.player.goldGloves,
-  }).toFixed(0)}`;
+  return `${s.g} G · ${pos} · ${s.seasonErrors} E`;
 }
 
 function pickBest<T>(
@@ -442,7 +438,7 @@ async function loadAwardInputs(leagueId: string) {
   });
   if (!league) throw new Error("League not found");
 
-  const [batting, pitching, lineups] = await Promise.all([
+  const [batting, pitching, lineups, fielding] = await Promise.all([
     prisma.seasonBattingStat.findMany({
       where: { leagueId },
       include: { player: true, team: true },
@@ -455,11 +451,19 @@ async function loadAwardInputs(leagueId: string) {
       where: { team: { leagueId } },
       select: { teamId: true, playerId: true, position: true },
     }),
+    prisma.seasonFieldingStat.findMany({
+      where: { leagueId },
+      select: { playerId: true, errors: true },
+    }),
   ]);
 
   const posByTeamPlayer = new Map<string, string>();
   for (const slot of lineups) {
     posByTeamPlayer.set(`${slot.teamId}:${slot.playerId}`, slot.position);
+  }
+  const errorsByPlayer = new Map<string, number>();
+  for (const f of fielding) {
+    errorsByPlayer.set(f.playerId, (errorsByPlayer.get(f.playerId) ?? 0) + f.errors);
   }
 
   const batRows: BatRow[] = batting.map((s) => ({
@@ -478,6 +482,7 @@ async function loadAwardInputs(leagueId: string) {
     triples: s.triples,
     hbp: s.hbp,
     sf: s.sf,
+    seasonErrors: errorsByPlayer.get(s.playerId) ?? 0,
     player: s.player,
     team: s.team,
     fieldPos:
@@ -500,6 +505,7 @@ async function loadAwardInputs(leagueId: string) {
     w: s.w,
     l: s.l,
     sv: s.sv,
+    seasonErrors: errorsByPlayer.get(s.playerId) ?? 0,
     player: s.player,
     team: s.team,
   }));

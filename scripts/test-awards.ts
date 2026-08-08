@@ -31,6 +31,7 @@ function bat(
     triples: number;
     hbp: number;
     sf: number;
+    seasonErrors: number;
     name: string;
     primaryPos: string;
     goldGloves: number;
@@ -59,6 +60,7 @@ function bat(
     triples: overrides.triples ?? 2,
     hbp: overrides.hbp ?? 5,
     sf: overrides.sf ?? 5,
+    seasonErrors: overrides.seasonErrors ?? 4,
     player: {
       id: playerId,
       name: overrides.name ?? "Hitter",
@@ -93,6 +95,7 @@ function pitch(
     w: number;
     l: number;
     sv: number;
+    seasonErrors: number;
     name: string;
     goldGloves: number;
     careerWAR: number;
@@ -118,6 +121,7 @@ function pitch(
     w: overrides.w ?? 18,
     l: overrides.l ?? 8,
     sv: overrides.sv ?? 0,
+    seasonErrors: overrides.seasonErrors ?? 1,
     player: {
       id: playerId,
       name: overrides.name ?? "Ace",

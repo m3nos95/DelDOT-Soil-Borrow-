@@ -140,10 +140,22 @@ export type PitcherBox = {
   sho: number;
 };
 
+export type FieldError = {
+  playerId: string;
+  name: string;
+  pos: string;
+  errors: number;
+};
+
 export type GameResult = {
   homeScore: number;
   awayScore: number;
   innings: number[];
+  homeErrors: number;
+  awayErrors: number;
+  /** Per-player fielding errors for each side */
+  homeFielding: FieldError[];
+  awayFielding: FieldError[];
   playByPlay: PlayEvent[];
   homeBox: { batters: BatterBox[]; pitchers: PitcherBox[] };
   awayBox: { batters: BatterBox[]; pitchers: PitcherBox[] };
@@ -806,6 +818,54 @@ export function simulateGame(opts: {
   const homeGlove = lineupDefense(opts.homeLineup);
   const awayGlove = lineupDefense(opts.awayLineup);
 
+  // Fielding errors tracked per side and attributed to a fielder
+  let homeErrors = 0;
+  let awayErrors = 0;
+  const homeFieldErrors = new Map<string, FieldError>();
+  const awayFieldErrors = new Map<string, FieldError>();
+
+  const ERROR_POS_WEIGHTS: [string, number][] = [
+    ["SS", 0.22],
+    ["3B", 0.18],
+    ["2B", 0.15],
+    ["1B", 0.1],
+    ["C", 0.05],
+    ["LF", 0.09],
+    ["CF", 0.09],
+    ["RF", 0.09],
+    ["P", 0.03],
+  ];
+
+  const chargeError = (
+    fieldingLineup: LineupEntry[],
+    errMap: Map<string, FieldError>,
+  ) => {
+    let roll = rand();
+    let pos = "SS";
+    for (const [p, w] of ERROR_POS_WEIGHTS) {
+      roll -= w;
+      if (roll < 0) {
+        pos = p;
+        break;
+      }
+    }
+    // Find a fielder at that position; fall back to any infielder
+    const slot =
+      fieldingLineup.find((e) => e.position === pos) ??
+      fieldingLineup.find((e) => e.position === "SS") ??
+      fieldingLineup[0];
+    if (!slot) return;
+    const prev = errMap.get(slot.player.id);
+    if (prev) prev.errors += 1;
+    else
+      errMap.set(slot.player.id, {
+        playerId: slot.player.id,
+        name: slot.player.name,
+        pos,
+        errors: 1,
+      });
+  };
+
   const awayBatters = new Map(
     opts.awayLineup.map((e) => [e.player.id, emptyBatter(e.player)]),
   );
@@ -1065,6 +1125,16 @@ export function simulateGame(opts: {
         arm.runsAllowed += 1;
       };
 
+      // Run scored on a fielding error — charged but UNEARNED (no ER, no RBI)
+      const creditUnearnedRun = (runner: SimPlayer) => {
+        runsThisHalf += 1;
+        if (fieldingHome) awayScore += 1;
+        else homeScore += 1;
+        batters.get(runner.id)!.r += 1;
+        arm.box.r += 1;
+        arm.runsAllowed += 1;
+      };
+
       if (outcome === "K") {
         outs += 1;
         box.ab += 1;
@@ -1123,6 +1193,40 @@ export function simulateGame(opts: {
           log(half, `${batter.name} ${label}.`, { outs, bases }, pa_);
         }
       } else if (outcome === "OUT") {
+        // Fielding error can turn a would-be out into reached-on-error
+        const glove = fieldingHome ? homeGlove : awayGlove;
+        const errChance = clamp(0.03 - (glove - 50) * 0.0009, 0.006, 0.05);
+        if (rand() < errChance) {
+          box.ab += 1; // ROE is an at-bat, not a hit
+          if (fieldingHome) {
+            homeErrors += 1;
+            chargeError(opts.homeLineup, homeFieldErrors);
+          } else {
+            awayErrors += 1;
+            chargeError(opts.awayLineup, awayFieldErrors);
+          }
+          // Batter safe at first; runners forced up one base
+          const scoredE: SimPlayer[] = [];
+          const nextE: BaseOccupant[] = [null, null, null];
+          if (bases[2]) scoredE.push(bases[2].player);
+          if (bases[1]) nextE[2] = bases[1];
+          if (bases[0]) nextE[1] = bases[0];
+          nextE[0] = { player: batter };
+          bases = nextE;
+          for (const r of scoredE) creditUnearnedRun(r);
+          const tail = scoredE.length
+            ? ` — ${scoredE.length} unearned run${scoredE.length > 1 ? "s" : ""} score`
+            : "";
+          log(
+            half,
+            `${batter.name} reaches on an error${tail}.`,
+            { outs, bases },
+            pa_,
+          );
+          noteLeadChange(fieldingHome, prevHome, prevAway);
+          if (outs < 3) maybeHook(half, outs, bases);
+          continue;
+        }
         outs += 1;
         arm.box.ip += 1 / 3;
         arm.outsRecorded += 1;
@@ -1263,6 +1367,10 @@ export function simulateGame(opts: {
     homeScore,
     awayScore,
     innings: inningScores,
+    homeErrors,
+    awayErrors,
+    homeFielding: [...homeFieldErrors.values()],
+    awayFielding: [...awayFieldErrors.values()],
     playByPlay,
     homeBox: {
       batters: opts.homeLineup.map((e) => homeBatters.get(e.player.id)!),

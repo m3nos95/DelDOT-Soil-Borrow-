@@ -50,6 +50,7 @@ model Player {
   staffSlots   StaffSlot[]
   battingStats SeasonBattingStat[]
   pitchingStats SeasonPitchingStat[]
+  fieldingStats SeasonFieldingStat[]
   awards       SeasonAward[]
   tradeAssets  TradeAsset[]
 
@@ -77,6 +78,7 @@ model League {
   games           Game[]
   battingStats    SeasonBattingStat[]
   pitchingStats   SeasonPitchingStat[]
+  fieldingStats   SeasonFieldingStat[]
   awards          SeasonAward[]
   trades          Trade[]
 }
@@ -96,6 +98,7 @@ model Team {
   losses       Int          @default(0)
   runsFor      Int          @default(0)
   runsAgainst  Int          @default(0)
+  errors       Int          @default(0)
   draftReady   Boolean      @default(false)
   createdAt    DateTime     @default(now())
   roster       RosterSpot[]
@@ -105,6 +108,7 @@ model Team {
   awayGames    Game[]       @relation("AwayTeam")
   battingStats SeasonBattingStat[]
   pitchingStats SeasonPitchingStat[]
+  fieldingStats SeasonFieldingStat[]
   awards       SeasonAward[]
   tradesProposed Trade[]    @relation("TradeProposer")
   tradesReceived Trade[]    @relation("TradePartner")
@@ -228,6 +232,22 @@ model SeasonPitchingStat {
   @@unique([leagueId, teamId, playerId])
   @@index([leagueId, so])
   @@index([leagueId, w])
+}
+
+/// Accumulated fielding for a player on a team this season (errors by position)
+model SeasonFieldingStat {
+  id       String @id @default(cuid())
+  leagueId String
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  teamId   String
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id])
+  pos      String @default("")
+  errors   Int    @default(0)
+
+  @@unique([leagueId, teamId, playerId])
+  @@index([leagueId])
 }
 
 /// End-of-season (or live race) hardware: MVP, Cy Young, Gold Glove, Silver Slugger
