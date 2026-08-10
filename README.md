@@ -42,6 +42,14 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Demo account (created by seed): `aaron` / `hardball`
 
+Draft salaries blend career WAR with a peak-rate term, but the peak is
+credibility-weighted by playing time (cup-of-coffee careers stay near the
+$500k floor). After pulling salary formula changes:
+
+```bash
+npm run db:salaries -- --apply
+```
+
 ## Deploy for free (Vercel + Turso)
 
 Host the full app at $0 on Vercel (Next.js) with a Turso (hosted libSQL)

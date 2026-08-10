@@ -240,20 +240,23 @@ def salary_from_value(war: float, playing_time: float, is_pitcher: bool) -> int:
     high-peak/short-career bats (Travis Hafner). We add a per-season rate term
     so peak quality matters, while bulk still rewards longevity.
 
+    Peak rate is credibility-weighted by playing time (full credit after one
+    season) and Bayesian-shrunk toward 0 with a 0.5-season prior — so a 4 PA /
+    0.2 WAR cup-of-coffee cannot price like Andruw Jones.
+
     playing_time is PA for hitters, IP for pitchers.
     Floor $500k, ceiling ~$32M.
     """
     war = max(-2.0, war)
-    if is_pitcher:
-        full = max(playing_time, 1.0) / 200.0  # ~200 IP season
-        per_season = clamp(war / full, -1.0, 8.0)
-        bulk = war if war <= 80 else 80 + (war - 80) * 0.45
-        raw = 500_000 + per_season * 2_300_000 + max(0.0, bulk) * 120_000
-    else:
-        full = max(playing_time, 1.0) / 650.0  # ~650 PA season
-        per_season = clamp(war / full, -1.0, 9.0)
-        bulk = war if war <= 80 else 80 + (war - 80) * 0.45
-        raw = 500_000 + per_season * 2_200_000 + max(0.0, bulk) * 130_000
+    season_size = 200.0 if is_pitcher else 650.0
+    seasons = max(playing_time, 0.0) / season_size
+    credibility = clamp(seasons / 1.0, 0.0, 1.0)
+    shrunk_rate = war / (seasons + 0.5)
+    per_season = clamp(shrunk_rate, -1.0, 8.0 if is_pitcher else 9.0)
+    bulk = war if war <= 80 else 80 + (war - 80) * 0.45
+    peak_pay = 2_300_000.0 if is_pitcher else 2_200_000.0
+    bulk_pay = 120_000.0 if is_pitcher else 130_000.0
+    raw = 500_000.0 + credibility * per_season * peak_pay + max(0.0, bulk) * bulk_pay
     salary = int(round(raw / 100_000) * 100_000)
     return int(clamp(salary, 500_000, 32_000_000))
 

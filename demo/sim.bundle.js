@@ -649,6 +649,44 @@ var HardballSim = (() => {
     const era = (_d = opts.era) != null ? _d : ERAS.neutral;
     const homeGlove = lineupDefense(opts.homeLineup);
     const awayGlove = lineupDefense(opts.awayLineup);
+    let homeErrors = 0;
+    let awayErrors = 0;
+    const homeFieldErrors = /* @__PURE__ */ new Map();
+    const awayFieldErrors = /* @__PURE__ */ new Map();
+    const ERROR_POS_WEIGHTS = [
+      ["SS", 0.22],
+      ["3B", 0.18],
+      ["2B", 0.15],
+      ["1B", 0.1],
+      ["C", 0.05],
+      ["LF", 0.09],
+      ["CF", 0.09],
+      ["RF", 0.09],
+      ["P", 0.03]
+    ];
+    const chargeError = (fieldingLineup, errMap) => {
+      var _a2, _b2;
+      let roll = rand();
+      let pos = "SS";
+      for (const [p, w] of ERROR_POS_WEIGHTS) {
+        roll -= w;
+        if (roll < 0) {
+          pos = p;
+          break;
+        }
+      }
+      const slot = (_b2 = (_a2 = fieldingLineup.find((e) => e.position === pos)) != null ? _a2 : fieldingLineup.find((e) => e.position === "SS")) != null ? _b2 : fieldingLineup[0];
+      if (!slot) return;
+      const prev = errMap.get(slot.player.id);
+      if (prev) prev.errors += 1;
+      else
+        errMap.set(slot.player.id, {
+          playerId: slot.player.id,
+          name: slot.player.name,
+          pos,
+          errors: 1
+        });
+    };
     const awayBatters = new Map(
       opts.awayLineup.map((e) => [e.player.id, emptyBatter(e.player)])
     );
@@ -845,6 +883,14 @@ var HardballSim = (() => {
           arm.box.er += 1;
           arm.runsAllowed += 1;
         };
+        const creditUnearnedRun = (runner) => {
+          runsThisHalf += 1;
+          if (fieldingHome) awayScore += 1;
+          else homeScore += 1;
+          batters.get(runner.id).r += 1;
+          arm.box.r += 1;
+          arm.runsAllowed += 1;
+        };
         if (outcome === "K") {
           outs += 1;
           box.ab += 1;
@@ -900,6 +946,36 @@ var HardballSim = (() => {
             log(half, `${batter.name} ${label}.`, { outs, bases }, pa_);
           }
         } else if (outcome === "OUT") {
+          const glove = fieldingHome ? homeGlove : awayGlove;
+          const errChance = clamp(0.03 - (glove - 50) * 9e-4, 6e-3, 0.05);
+          if (rand() < errChance) {
+            box.ab += 1;
+            if (fieldingHome) {
+              homeErrors += 1;
+              chargeError(opts.homeLineup, homeFieldErrors);
+            } else {
+              awayErrors += 1;
+              chargeError(opts.awayLineup, awayFieldErrors);
+            }
+            const scoredE = [];
+            const nextE = [null, null, null];
+            if (bases[2]) scoredE.push(bases[2].player);
+            if (bases[1]) nextE[2] = bases[1];
+            if (bases[0]) nextE[1] = bases[0];
+            nextE[0] = { player: batter };
+            bases = nextE;
+            for (const r of scoredE) creditUnearnedRun(r);
+            const tail = scoredE.length ? ` \u2014 ${scoredE.length} unearned run${scoredE.length > 1 ? "s" : ""} score` : "";
+            log(
+              half,
+              `${batter.name} reaches on an error${tail}.`,
+              { outs, bases },
+              pa_
+            );
+            noteLeadChange(fieldingHome, prevHome, prevAway);
+            if (outs < 3) maybeHook(half, outs, bases);
+            continue;
+          }
           outs += 1;
           arm.box.ip += 1 / 3;
           arm.outsRecorded += 1;
@@ -1006,6 +1082,10 @@ var HardballSim = (() => {
       homeScore,
       awayScore,
       innings: inningScores,
+      homeErrors,
+      awayErrors,
+      homeFielding: [...homeFieldErrors.values()],
+      awayFielding: [...awayFieldErrors.values()],
       playByPlay,
       homeBox: {
         batters: opts.homeLineup.map((e) => homeBatters.get(e.player.id)),
