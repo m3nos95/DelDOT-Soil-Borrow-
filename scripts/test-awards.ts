@@ -12,7 +12,8 @@ import {
   awardLabel,
 } from "../src/lib/awards";
 import { generateInviteCode, simulateDays, startSeason } from "../src/lib/league";
-import { autoDraftTeam, fillCpuTeams } from "../src/lib/cpu";
+import { fillCpuTeams } from "../src/lib/cpu";
+import { runSnakeDraftToCompletion } from "../src/lib/snake-draft";
 
 function bat(
   overrides: Partial<{
@@ -314,6 +315,7 @@ async function integration() {
       maxTeams: 4,
       gamesPerTeam: 6,
       era: "modern",
+      draftRounds: 16,
       commissionerId: user.id,
       status: "drafting",
       teams: {
@@ -323,14 +325,15 @@ async function integration() {
           abbreviation: "BOS",
           park: "Boston Park",
           isCpu: false,
+          draftOrder: 0,
         },
       },
     },
     include: { teams: true },
   });
 
-  await autoDraftTeam(league.teams[0].id, 2);
   await fillCpuTeams(league.id);
+  await runSnakeDraftToCompletion(league.id);
   await startSeason(league.id);
 
   // Play the regular season and the full postseason

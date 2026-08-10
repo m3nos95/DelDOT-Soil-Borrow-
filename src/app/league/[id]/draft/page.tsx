@@ -9,6 +9,11 @@ import {
   dynastyEraById,
   dynastyEraPlayerWhere,
 } from "@/lib/environment";
+import {
+  advanceCpuPicks,
+  getDraftState,
+  reassignDraftOrders,
+} from "@/lib/snake-draft";
 
 const PAGE_SIZE = 75;
 
@@ -36,7 +41,7 @@ export default async function DraftPage({
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const league = await prisma.league.findUnique({
+  let league = await prisma.league.findUnique({
     where: { id },
     include: {
       teams: {
@@ -49,8 +54,30 @@ export default async function DraftPage({
   });
   if (!league) notFound();
 
-  const myTeam = league.teams.find((t) => t.ownerId === session.id);
-  if (!myTeam) redirect("/clubhouse");
+  if (!league.teams.some((t) => t.ownerId === session.id)) {
+    redirect("/clubhouse");
+  }
+
+  if (league.status === "drafting" && league.draftPickNumber === 0) {
+    await reassignDraftOrders(id);
+  }
+  if (league.status === "drafting") {
+    await advanceCpuPicks(id);
+  }
+  const draftState = await getDraftState(id);
+
+  league = await prisma.league.findUniqueOrThrow({
+    where: { id },
+    include: {
+      teams: {
+        include: {
+          owner: true,
+          roster: { include: { player: true } },
+        },
+      },
+    },
+  });
+  const myTeam = league.teams.find((t) => t.ownerId === session.id)!;
 
   const tab = sp.tab === "pitchers" || sp.tab === "roster" ? sp.tab : "hitters";
   const q = (sp.q ?? "").trim();
@@ -124,7 +151,7 @@ export default async function DraftPage({
           {era.id !== "open" ? ` · ${era.yearFrom}–${era.yearTo}` : ""}
           {" · "}
           <span className="stat-mono">{poolCount.toLocaleString()}</span> career
-          cards
+          cards (full careers — not sliced to the window)
         </p>
         <LeagueNav leagueId={id} status={league.status} />
         <DraftBoard
@@ -137,6 +164,27 @@ export default async function DraftPage({
           q={q}
           page={page}
           total={total}
+          clock={{
+            complete: draftState.complete,
+            isMyTurn: draftState.onClock?.id === myTeam.id,
+            onClockAbbr: draftState.onClock?.abbreviation ?? null,
+            onClockName: draftState.onClock
+              ? draftState.onClock.isCpu
+                ? `${draftState.onClock.name} (CPU)`
+                : draftState.onClock.owner.displayName
+              : null,
+            round: draftState.round,
+            pickInRound: draftState.pickInRound,
+            pickNumber: draftState.pickNumber,
+            totalPicks: draftState.totalPicks,
+            rounds: draftState.rounds,
+            order: draftState.teams.map((t) => ({
+              abbr: t.abbreviation,
+              name: t.name,
+              isCpu: t.isCpu,
+              isYou: t.id === myTeam.id,
+            })),
+          }}
           players={players.map((p) => ({
             id: p.id,
             name: p.name,

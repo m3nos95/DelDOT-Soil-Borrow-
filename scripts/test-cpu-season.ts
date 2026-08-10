@@ -7,8 +7,8 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import { evaluateIncomingTradeAsCpu, fillCpuTeams } from "../src/lib/cpu";
 import { generateInviteCode, simulateNextDay, startSeason } from "../src/lib/league";
+import { runSnakeDraftToCompletion } from "../src/lib/snake-draft";
 import { executeTrade } from "../src/lib/trades";
-import { autoDraftTeam } from "../src/lib/cpu";
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
@@ -33,6 +33,7 @@ async function main() {
       maxTeams: 4,
       gamesPerTeam: 8,
       era: "modern",
+      draftRounds: 16,
       commissionerId: user.id,
       status: "drafting",
       teams: {
@@ -42,22 +43,31 @@ async function main() {
           abbreviation: "BOS",
           park: "Boston Park",
           isCpu: false,
+          draftOrder: 0,
         },
       },
     },
     include: { teams: true },
   });
 
-  await autoDraftTeam(league.teams[0].id, 2);
   const filled = await fillCpuTeams(league.id);
   if (filled.created !== 3) {
     throw new Error(`Expected 3 CPU teams, got ${filled.created}`);
   }
+  await runSnakeDraftToCompletion(league.id);
 
   const teams = await prisma.team.findMany({ where: { leagueId: league.id } });
   if (teams.length !== 4) throw new Error("League not full");
   if (!teams.every((t) => t.draftReady)) throw new Error("Not all ready");
   if (teams.filter((t) => t.isCpu).length !== 3) throw new Error("CPU count");
+  // Exclusivity: no player on two teams
+  const spots = await prisma.rosterSpot.findMany({
+    where: { leagueId: league.id },
+  });
+  const ids = spots.map((s) => s.playerId);
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("Duplicate player ownership in league");
+  }
 
   await startSeason(league.id);
   for (let i = 0; i < 2; i++) await simulateNextDay(league.id);

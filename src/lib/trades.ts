@@ -155,12 +155,20 @@ export async function applyTradeAssets(tradeId: string) {
     }
     for (const a of fromProposer) {
       await tx.rosterSpot.create({
-        data: { teamId: trade.partnerTeamId, playerId: a.playerId },
+        data: {
+          teamId: trade.partnerTeamId,
+          playerId: a.playerId,
+          leagueId: trade.leagueId,
+        },
       });
     }
     for (const a of fromPartner) {
       await tx.rosterSpot.create({
-        data: { teamId: trade.proposerTeamId, playerId: a.playerId },
+        data: {
+          teamId: trade.proposerTeamId,
+          playerId: a.playerId,
+          leagueId: trade.leagueId,
+        },
       });
     }
     await tx.trade.update({

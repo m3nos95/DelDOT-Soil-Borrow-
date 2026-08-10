@@ -26,6 +26,11 @@ import {
   ensureDefaultLineup,
 } from "@/lib/league";
 import {
+  advanceCpuPicks,
+  getDraftState,
+  reassignDraftOrders,
+} from "@/lib/snake-draft";
+import {
   applyTradeAssets,
   cancelTrade,
   executeTrade,
@@ -92,12 +97,15 @@ export async function createLeagueAction(
       salaryCap: 120_000_000,
       commissionerId: user.id,
       status: "drafting",
+      draftPickNumber: 0,
+      draftRounds: 20,
       teams: {
         create: {
           ownerId: user.id,
           name: franchise.name,
           abbreviation: franchise.code,
           park: franchise.park,
+          draftOrder: 0,
         },
       },
     },
@@ -129,6 +137,9 @@ export async function joinLeagueAction(
   if (league.status !== "drafting" && league.status !== "forming") {
     return { error: "That league is no longer accepting teams" };
   }
+  if (league.draftPickNumber > 0) {
+    return { error: "Snake draft already started — joining is closed" };
+  }
   if (league.teams.some((t) => t.ownerId === user.id && !t.isCpu)) {
     redirect(`/league/${league.id}`);
   }
@@ -146,8 +157,10 @@ export async function joinLeagueAction(
       name: franchise.name,
       abbreviation: franchise.code,
       park: franchise.park,
+      draftOrder: league.teams.length,
     },
   });
+  await reassignDraftOrders(league.id);
 
   redirect(`/league/${league.id}`);
 }
@@ -158,12 +171,21 @@ export async function draftPlayerAction(
 ): Promise<ActionState> {
   const user = await mustUser();
   const team = await prisma.team.findFirst({
-    where: { leagueId, ownerId: user.id },
+    where: { leagueId, ownerId: user.id, isCpu: false },
     include: { roster: { include: { player: true } }, league: true },
   });
   if (!team) return { error: "You are not in this league" };
   if (team.league.status !== "drafting") return { error: "Draft is closed" };
-  if (team.draftReady) return { error: "You already locked your roster" };
+
+  const state = await getDraftState(leagueId);
+  if (state.numTeams < 2) {
+    return { error: "Need at least 2 teams before drafting (invite or fill CPU)" };
+  }
+  if (state.complete) return { error: "Snake draft is already finished" };
+  if (!state.onClock || state.onClock.id !== team.id) {
+    const who = state.onClock?.abbreviation ?? "another team";
+    return { error: `It's ${who}'s pick` };
+  }
 
   const taken = await draftedPlayerIds(leagueId);
   if (taken.has(playerId)) return { error: "Player already drafted" };
@@ -193,13 +215,47 @@ export async function draftPlayerAction(
   }
   if (team.roster.length >= 25) return { error: "Roster is full (25)" };
 
-  await prisma.rosterSpot.create({
-    data: { teamId: team.id, playerId },
+  try {
+    await prisma.rosterSpot.create({
+      data: { teamId: team.id, playerId, leagueId },
+    });
+  } catch {
+    return { error: "Player already drafted" };
+  }
+
+  await prisma.league.update({
+    where: { id: leagueId },
+    data: { draftPickNumber: state.pickNumber + 1 },
   });
+
+  // CPU teams pick automatically until the next human is on the clock
+  await advanceCpuPicks(leagueId);
 
   revalidatePath(`/league/${leagueId}`);
   revalidatePath(`/league/${leagueId}/draft`);
   return { ok: true };
+}
+
+/** Advance CPU picks if a computer team is on the clock (page load / poll). */
+export async function syncDraftClockAction(
+  leagueId: string,
+): Promise<ActionState> {
+  const user = await mustUser();
+  const team = await prisma.team.findFirst({
+    where: { leagueId, ownerId: user.id },
+  });
+  if (!team) return { error: "You are not in this league" };
+  const res = await advanceCpuPicks(leagueId);
+  revalidatePath(`/league/${leagueId}`);
+  revalidatePath(`/league/${leagueId}/draft`);
+  return {
+    ok: true,
+    message: res.complete
+      ? "Snake draft complete"
+      : res.made
+        ? `CPU made ${res.made} pick${res.made === 1 ? "" : "s"}`
+        : undefined,
+  };
 }
 
 export async function releasePlayerAction(
@@ -212,8 +268,10 @@ export async function releasePlayerAction(
     include: { league: true },
   });
   if (!team) return { error: "You are not in this league" };
-  if (team.league.status !== "drafting") return { error: "Draft is closed" };
-  if (team.draftReady) return { error: "Roster is locked" };
+  if (team.league.status === "drafting") {
+    return { error: "Can't drop during the snake draft" };
+  }
+  if (team.league.status !== "season") return { error: "Can't drop now" };
 
   await prisma.rosterSpot.deleteMany({
     where: { teamId: team.id, playerId },
@@ -234,6 +292,13 @@ export async function setDraftReadyAction(
   });
   if (!team) return { error: "You are not in this league" };
   if (team.league.status !== "drafting") return { error: "Not in draft" };
+
+  const state = await getDraftState(leagueId);
+  if (!state.complete) {
+    return {
+      error: "Finish the snake draft first — picks alternate team-by-team",
+    };
+  }
 
   if (ready) {
     const hitters = team.roster.filter((r) => !r.player.isPitcher).length;
@@ -283,9 +348,21 @@ export async function startSeasonAction(leagueId: string): Promise<ActionState> 
     return { error: "Only the commissioner can start the season" };
   }
   try {
-    // Pad empty slots with auto-drafted CPU clubs, then start
+    // Pad empty slots with CPU clubs only before the snake starts, then
+    // require the snake draft to finish before opening the season.
     if (league.teams.length < league.maxTeams) {
+      if (league.draftPickNumber > 0) {
+        return { error: "Fill CPU slots before the first pick" };
+      }
       await fillCpuTeams(leagueId);
+    }
+    await advanceCpuPicks(leagueId);
+    const state = await getDraftState(leagueId);
+    if (!state.complete) {
+      return {
+        error:
+          "Finish the snake draft first (open Draft and take your picks)",
+      };
     }
     await startSeason(leagueId);
   } catch (e) {
@@ -526,7 +603,13 @@ export async function signFreeAgentAction(
   if (player.isPitcher && pitchers >= 11) return { error: "Max 11 pitchers" };
   if (team.roster.length >= 25) return { error: "Roster is full (25)" };
 
-  await prisma.rosterSpot.create({ data: { teamId: team.id, playerId } });
+  try {
+    await prisma.rosterSpot.create({
+      data: { teamId: team.id, playerId, leagueId },
+    });
+  } catch {
+    return { error: "Player is already on a roster" };
+  }
   await ensureDefaultLineup(team.id);
 
   revalidatePath(`/league/${leagueId}`);

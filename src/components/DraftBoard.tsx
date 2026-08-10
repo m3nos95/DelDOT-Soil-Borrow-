@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   draftPlayerAction,
-  releasePlayerAction,
-  setDraftReadyAction,
+  syncDraftClockAction,
 } from "@/app/actions/league";
 import { formatSalary } from "@/lib/format";
 
@@ -22,6 +21,19 @@ type PlayerRow = {
   careerWAR?: number;
   takenBy?: string | null;
   onMyRoster?: boolean;
+};
+
+type DraftClock = {
+  complete: boolean;
+  isMyTurn: boolean;
+  onClockAbbr: string | null;
+  onClockName: string | null;
+  round: number;
+  pickInRound: number;
+  pickNumber: number;
+  totalPicks: number;
+  rounds: number;
+  order: { abbr: string; name: string; isCpu: boolean; isYou: boolean }[];
 };
 
 function draftHref(
@@ -46,6 +58,7 @@ export function DraftBoard({
   tab,
   q,
   total,
+  clock,
 }: {
   leagueId: string;
   salaryCap: number;
@@ -57,6 +70,7 @@ export function DraftBoard({
   q: string;
   page: number;
   total: number;
+  clock: DraftClock;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState(q);
@@ -73,6 +87,30 @@ export function DraftBoard({
       else router.refresh();
     });
   }
+
+  // If a CPU is on the clock when you open the board, advance them.
+  useEffect(() => {
+    if (locked || clock.complete) return;
+    if (clock.isMyTurn || !clock.onClockAbbr) return;
+    let cancelled = false;
+    (async () => {
+      await syncDraftClockAction(leagueId);
+      if (!cancelled) router.refresh();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    leagueId,
+    locked,
+    clock.complete,
+    clock.isMyTurn,
+    clock.onClockAbbr,
+    clock.pickNumber,
+    router,
+  ]);
+
+  const canDraft = !locked && !clock.complete && clock.isMyTurn && !draftReady;
 
   return (
     <div className="space-y-2">
@@ -97,26 +135,59 @@ export function DraftBoard({
             </div>
             <div className="mt-2 text-xs text-[var(--fog)]">
               Showing {players.length.toLocaleString()} of{" "}
-              {total.toLocaleString()} · one career card per player
+              {total.toLocaleString()} · one career card per player · full career
+              rates
             </div>
           </div>
-          {!locked ? (
-            <button
-              className={`btn ${draftReady ? "btn-ghost" : "btn-primary"}`}
-              disabled={pending}
-              onClick={() =>
-                act(() => setDraftReadyAction(leagueId, !draftReady))
-              }
-            >
-              {draftReady ? "Unlock roster" : "Lock roster"}
-            </button>
-          ) : null}
+          <div className="text-sm sm:text-right">
+            {clock.complete ? (
+              <p className="text-[var(--foul)]">
+                Snake draft complete — commissioner can start the season.
+              </p>
+            ) : (
+              <>
+                <p className="font-[family-name:var(--font-display)] text-sm tracking-[0.14em] uppercase text-[var(--foul)]">
+                  {clock.isMyTurn
+                    ? "You're on the clock"
+                    : `On the clock: ${clock.onClockAbbr ?? "—"}`}
+                </p>
+                <p className="mt-1 text-[var(--fog)]">
+                  Round {clock.round}/{clock.rounds} · pick {clock.pickInRound} ·{" "}
+                  overall {Math.min(clock.pickNumber + 1, clock.totalPicks)}/
+                  {clock.totalPicks}
+                </p>
+              </>
+            )}
+          </div>
         </div>
 
+        {clock.order.length ? (
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--fog)]">
+            <span className="font-[family-name:var(--font-display)] tracking-[0.12em] uppercase">
+              Order
+            </span>
+            {clock.order.map((t, i) => (
+              <span
+                key={`${t.abbr}-${i}`}
+                className={
+                  t.isYou ? "text-[var(--foul)]" : undefined
+                }
+              >
+                {i + 1}. {t.abbr}
+                {t.isCpu ? " (CPU)" : ""}
+                {i < clock.order.length - 1 ? " →" : ""}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
         {error ? <p className="mt-3 text-sm text-[#f0a8a8]">{error}</p> : null}
-        {draftReady ? (
-          <p className="mt-3 text-sm text-[var(--foul)]">
-            Roster locked — waiting on other owners / commissioner.
+        {!clock.complete && !clock.isMyTurn && !locked ? (
+          <p className="mt-3 text-sm text-[var(--fog)]">
+            Waiting on {clock.onClockName ?? clock.onClockAbbr}
+            {clock.onClockAbbr?.includes("CPU") || clock.order.find((o) => o.abbr === clock.onClockAbbr)?.isCpu
+              ? " — CPU is picking…"
+              : "."}
           </p>
         ) : null}
       </div>
@@ -203,21 +274,15 @@ export function DraftBoard({
                     {formatSalary(p.salary)}
                   </td>
                   <td className="text-right">
-                    {p.onMyRoster && !draftReady && !locked ? (
-                      <button
-                        className="btn btn-danger !py-1.5 !px-3 !text-xs"
-                        disabled={pending}
-                        onClick={() =>
-                          act(() => releasePlayerAction(leagueId, p.id))
-                        }
-                      >
-                        Drop
-                      </button>
+                    {p.onMyRoster ? (
+                      <span className="font-[family-name:var(--font-display)] text-xs tracking-[0.12em] uppercase text-[var(--foul)]">
+                        Yours
+                      </span>
                     ) : p.takenBy ? (
                       <span className="font-[family-name:var(--font-display)] text-xs tracking-[0.12em] uppercase text-[var(--fog)]">
                         {p.takenBy}
                       </span>
-                    ) : !draftReady && !locked ? (
+                    ) : canDraft ? (
                       <button
                         className="btn btn-ghost !py-1.5 !px-3 !text-xs"
                         disabled={pending || p.salary > remaining}
@@ -227,7 +292,9 @@ export function DraftBoard({
                       >
                         Draft
                       </button>
-                    ) : null}
+                    ) : (
+                      <span className="text-xs text-[var(--fog)]">—</span>
+                    )}
                   </td>
                 </tr>
               ))
@@ -235,7 +302,6 @@ export function DraftBoard({
           </tbody>
         </table>
       </div>
-
     </div>
   );
 }

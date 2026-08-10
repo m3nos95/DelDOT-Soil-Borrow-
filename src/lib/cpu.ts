@@ -15,6 +15,7 @@ import {
   type GmPlayer,
 } from "./gm";
 import { draftedPlayerIds, ensureDefaultLineup, getLeaguePayroll } from "./league";
+import { reassignDraftOrders } from "./snake-draft";
 import { executeTrade } from "./trades";
 
 const CPU_USERNAME = "__hardball_cpu__";
@@ -104,7 +105,9 @@ export async function autoDraftTeam(teamId: string, seed = 1) {
   ).length;
 
   const take = async (p: (typeof pool)[number]) => {
-    await prisma.rosterSpot.create({ data: { teamId, playerId: p.id } });
+    await prisma.rosterSpot.create({
+      data: { teamId, playerId: p.id, leagueId: team.leagueId },
+    });
     taken.add(p.id);
     payroll += p.salary;
     if (p.isPitcher) pitchers += 1;
@@ -182,7 +185,10 @@ export async function autoDraftTeam(teamId: string, seed = 1) {
   });
 }
 
-/** Create CPU franchises for every empty slot up to maxTeams. */
+/**
+ * Create CPU franchises for every empty slot up to maxTeams.
+ * Does NOT auto-draft — they pick via the snake draft.
+ */
 export async function fillCpuTeams(leagueId: string) {
   const league = await prisma.league.findUniqueOrThrow({
     where: { id: leagueId },
@@ -191,12 +197,18 @@ export async function fillCpuTeams(leagueId: string) {
   if (league.status !== "drafting" && league.status !== "forming") {
     throw new Error("Can only fill CPU teams before the season starts");
   }
+  if (league.draftPickNumber > 0) {
+    throw new Error("Cannot add CPU teams after the snake draft has started");
+  }
 
   const cpuUser = await ensureCpuUser();
   const takenCodes = new Set(league.teams.map((t) => t.abbreviation));
   const open = FRANCHISES.filter((f) => !takenCodes.has(f.code));
   const need = league.maxTeams - league.teams.length;
-  if (need <= 0) return { created: 0 };
+  if (need <= 0) {
+    await reassignDraftOrders(leagueId);
+    return { created: 0 };
+  }
 
   const created: string[] = [];
   for (let i = 0; i < need; i++) {
@@ -210,11 +222,12 @@ export async function fillCpuTeams(leagueId: string) {
         name: franchise.name,
         abbreviation: franchise.code,
         park: franchise.park,
+        draftOrder: league.teams.length + created.length,
       },
     });
-    await autoDraftTeam(team.id, i + 3);
     created.push(team.id);
   }
+  await reassignDraftOrders(leagueId);
   return { created: created.length };
 }
 
@@ -229,8 +242,8 @@ async function freeAgentPool(leagueId: string, eraId: string) {
   return players.filter((p) => !taken.has(p.id)).map(toGm);
 }
 
-async function signPlayer(teamId: string, playerId: string) {
-  await prisma.rosterSpot.create({ data: { teamId, playerId } });
+async function signPlayer(teamId: string, playerId: string, leagueId: string) {
+  await prisma.rosterSpot.create({ data: { teamId, playerId, leagueId } });
 }
 
 async function cutPlayer(teamId: string, playerId: string) {
@@ -277,7 +290,7 @@ export async function runCpuFrontOffice(leagueId: string) {
         roster = roster.filter((p) => p.id !== cut.id);
         payroll -= cut.salary;
         if (target) {
-          await signPlayer(team.id, target.id);
+          await signPlayer(team.id, target.id, leagueId);
           fa += 1;
           roster = [...roster, target];
           payroll += target.salary;
@@ -292,7 +305,7 @@ export async function runCpuFrontOffice(leagueId: string) {
       payroll,
     });
     if (target && roster.length < 25) {
-      await signPlayer(team.id, target.id);
+      await signPlayer(team.id, target.id, leagueId);
       fa += 1;
       await ensureDefaultLineup(team.id);
     } else if (cuts > 0 || fa > 0) {

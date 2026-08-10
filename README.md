@@ -68,11 +68,15 @@ npm run db:reseed   # clears leagues and reloads the player table
 
 1. Create accounts
 2. One person creates a league, picks a **dynasty era**, and shares the invite code
-3. Draft only that era’s career cards (Pre-1950 / 1950–79 / 1980–99 / 2000–now, or All-time chaos)
-4. Lock rosters → commissioner starts the season
-5. Hit **Sim next day**, check box scores, argue in the group chat
+3. Fill empty slots with CPU (before pick 1) or wait for friends to join
+4. **Snake draft** — pick 1, then the next team, snaking each round. One player per team.
+5. When the draft finishes, commissioner starts the season
+6. Hit **Sim next day**, check box scores, argue in the group chat
 
-Era locks keep rates apples-to-apples — Hunter Greene doesn’t get a free K party against Babe Ruth unless you choose All-time.
+Era locks decide **who is eligible**, not a sliced season card. Barry Bonds in
+1980–1999 is still full-career Bonds (1986–2007 rates/WAR), because he overlaps
+that window. Hunter Greene stays out of Ruth’s Pre-1950 league unless you choose
+All-time.
 
 ## Stack
 

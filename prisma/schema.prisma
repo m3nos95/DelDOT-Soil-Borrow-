@@ -73,6 +73,10 @@ model League {
   autoAdvance     Boolean  @default(false)
   /// Increments each finished season for dynasty history
   seasonNumber    Int      @default(1)
+  /// 0-based index of the next snake-draft pick
+  draftPickNumber Int      @default(0)
+  /// Picks per team in the snake draft
+  draftRounds     Int      @default(20)
   playoffSeries   PlayoffSeries[]
   champions       Champion[]
   commissionerId  String
@@ -85,6 +89,7 @@ model League {
   fieldingStats   SeasonFieldingStat[]
   awards          SeasonAward[]
   trades          Trade[]
+  rosterSpots     RosterSpot[]
 }
 
 model Team {
@@ -103,6 +108,8 @@ model Team {
   runsFor      Int          @default(0)
   runsAgainst  Int          @default(0)
   errors       Int          @default(0)
+  /// 0-based snake-draft slot (set on join / CPU fill)
+  draftOrder   Int          @default(0)
   draftReady   Boolean      @default(false)
   createdAt    DateTime     @default(now())
   roster       RosterSpot[]
@@ -120,16 +127,22 @@ model Team {
 
   @@unique([leagueId, abbreviation])
   @@index([leagueId, ownerId])
+  @@index([leagueId, draftOrder])
 }
 
 model RosterSpot {
   id       String @id @default(cuid())
+  leagueId String
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
   teamId   String
   team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
   playerId String
   player   Player @relation(fields: [playerId], references: [id])
 
   @@unique([teamId, playerId])
+  /// One team per player inside a league
+  @@unique([leagueId, playerId])
+  @@index([leagueId])
 }
 
 model LineupSlot {

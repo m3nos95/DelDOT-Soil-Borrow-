@@ -1,12 +1,13 @@
 /** Dev-only: create an in-season league for `aaron` with a couple days played. */
 import "dotenv/config";
 import { makePrismaClient } from "./prisma-client";
-import { autoDraftTeam, fillCpuTeams } from "../src/lib/cpu";
+import { fillCpuTeams } from "../src/lib/cpu";
 import {
   generateInviteCode,
   simulateNextDay,
   startSeason,
 } from "../src/lib/league";
+import { runSnakeDraftToCompletion } from "../src/lib/snake-draft";
 
 const prisma = makePrismaClient();
 
@@ -43,8 +44,8 @@ async function main() {
     include: { teams: true },
   });
 
-  await autoDraftTeam(league.teams[0].id, 2);
   await fillCpuTeams(league.id);
+  await runSnakeDraftToCompletion(league.id);
   await startSeason(league.id);
   await simulateNextDay(league.id);
   await simulateNextDay(league.id);

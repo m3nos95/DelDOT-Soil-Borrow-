@@ -89,8 +89,9 @@ export default async function LeaguePage({
                 Draft room
               </h2>
               <p className="mb-5 text-[var(--fog)]">
-                25-man roster under the cap. Lock when you have at least 10
-                hitters and 6 pitchers.
+                Snake draft — one pick at a time, then the next team. Each
+                player can only be on one roster. Career cards are full careers
+                (era only decides who’s eligible).
               </p>
               <Link href={`/league/${id}/draft`} className="btn btn-primary">
                 Open draft
@@ -98,12 +99,17 @@ export default async function LeaguePage({
             </div>
             <div className="panel">
               <h2 className="mb-3 font-[family-name:var(--font-display)] text-3xl tracking-wide">
-                Ready check
+                Draft board
               </h2>
               <ul className="mb-5 space-y-2 text-sm">
-                {league.teams.map((t) => (
+                {[...league.teams]
+                  .sort((a, b) => a.draftOrder - b.draftOrder)
+                  .map((t) => (
                   <li key={t.id} className="flex justify-between gap-3 border-b border-[var(--line)] py-2">
                     <span>
+                      <span className="stat-mono text-[var(--fog)]">
+                        #{t.draftOrder + 1}
+                      </span>{" "}
                       {t.abbreviation}{" "}
                       <span className="text-[var(--fog)]">
                         {t.isCpu ? "CPU" : t.owner.displayName}
@@ -114,7 +120,9 @@ export default async function LeaguePage({
                         t.draftReady ? "text-[var(--foul)]" : "text-[var(--fog)]"
                       }
                     >
-                      {t.draftReady ? "LOCKED" : `${t.roster.length} players`}
+                      {t.draftReady
+                        ? "DONE"
+                        : `${t.roster.length}/${league.draftRounds}`}
                     </span>
                   </li>
                 ))}
@@ -122,19 +130,24 @@ export default async function LeaguePage({
               {openSlots > 0 ? (
                 <p className="mb-4 text-sm text-[var(--fog)]">
                   {openSlots} open slot{openSlots === 1 ? "" : "s"} — fill with
-                  CPU or invite friends.
+                  CPU <em>before</em> the first pick, or invite friends.
                 </p>
               ) : null}
               {league.commissionerId === session.id ? (
                 <CommissionerStart
                   leagueId={id}
-                  canStart={allReady}
-                  canFillCpu={openSlots > 0}
+                  canStart={
+                    allReady ||
+                    (league.teams.length >= 2 &&
+                      league.draftPickNumber >=
+                        league.teams.length * league.draftRounds)
+                  }
+                  canFillCpu={openSlots > 0 && league.draftPickNumber === 0}
                 />
               ) : (
                 <p className="text-sm text-[var(--fog)]">
-                  Commissioner starts when human owners lock. Empty slots become
-                  CPU.
+                  Commissioner starts after the snake draft finishes. Empty
+                  slots become CPU before pick 1.
                 </p>
               )}
             </div>
