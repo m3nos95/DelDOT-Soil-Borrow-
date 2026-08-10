@@ -129,8 +129,9 @@ export async function autoDraftTeam(teamId: string, seed = 1) {
     ((p.name.charCodeAt(0) + seed) % 7) * 0.01;
 
   // Phase 1: construction minimums — affordable efficiency, leave cap room
-  while (hitters < 10 || pitchers < 6) {
-    const wantPitcher = pitchers < 6 && (hitters >= 10 || pitchers <= hitters);
+  // Need 8 arms so SP1–SP5 + bullpen can be filled (one ace ≠ 162 starts)
+  while (hitters < 10 || pitchers < 8) {
+    const wantPitcher = pitchers < 8 && (hitters >= 10 || pitchers <= hitters);
     const reserve = Math.max(0, (16 - hitters - pitchers) * 1_500_000);
     const cand = available(reserve)
       .filter((p) => p.isPitcher === wantPitcher)
@@ -172,7 +173,7 @@ export async function autoDraftTeam(teamId: string, seed = 1) {
     await take(pick);
   }
 
-  if (hitters < 10 || pitchers < 6) {
+  if (hitters < 10 || pitchers < 8) {
     throw new Error(
       `CPU auto-draft underfilled ${team.abbreviation} (${hitters}H/${pitchers}P)`,
     );
