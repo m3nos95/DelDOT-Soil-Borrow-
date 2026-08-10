@@ -90,8 +90,8 @@ export default async function LeaguePage({
               </h2>
               <p className="mb-5 text-[var(--fog)]">
                 Snake draft — one pick at a time, then the next team. Each
-                player can only be on one roster. Career cards are full careers
-                (era only decides who’s eligible).
+                player can only be on one roster. Build 5 starters + a bullpen;
+                career cards are full careers (era only decides who’s eligible).
               </p>
               <Link href={`/league/${id}/draft`} className="btn btn-primary">
                 Open draft

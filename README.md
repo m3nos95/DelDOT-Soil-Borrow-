@@ -70,8 +70,9 @@ npm run db:reseed   # clears leagues and reloads the player table
 2. One person creates a league, picks a **dynasty era**, and shares the invite code
 3. Fill empty slots with CPU (before pick 1) or wait for friends to join
 4. **Snake draft** — pick 1, then the next team, snaking each round. One player per team.
-5. When the draft finishes, commissioner starts the season
-6. Hit **Sim next day**, check box scores, argue in the group chat
+5. Build a real staff: **5 starters + bullpen** (starters rotate by game day)
+6. When the draft finishes, commissioner starts the season
+7. Hit **Sim next day**, check box scores, argue in the group chat
 
 Era locks decide **who is eligible**, not a sliced season card. Barry Bonds in
 1980–1999 is still full-career Bonds (1986–2007 rates/WAR), because he overlaps

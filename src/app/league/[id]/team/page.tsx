@@ -57,7 +57,8 @@ export default async function TeamPage({
           {refreshed.name}
         </h1>
         <p className="mb-6 text-[var(--fog)]">
-          Set your nine and your arms. Starters rotate by game day.
+          Set your nine and a full staff — five starters who rotate by game day,
+          plus a bullpen. Randy Johnson is not starting 162.
         </p>
         <LeagueNav leagueId={id} status={league.status} />
         {refreshed.roster.length < 10 ? (

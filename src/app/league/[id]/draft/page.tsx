@@ -151,7 +151,8 @@ export default async function DraftPage({
           {era.id !== "open" ? ` · ${era.yearFrom}–${era.yearTo}` : ""}
           {" · "}
           <span className="stat-mono">{poolCount.toLocaleString()}</span> career
-          cards (full careers — not sliced to the window)
+          cards (full careers — not sliced to the window). Aim for 5 starters +
+          a bullpen — the season needs a real rotation.
         </p>
         <LeagueNav leagueId={id} status={league.status} />
         <DraftBoard

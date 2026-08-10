@@ -134,15 +134,23 @@ export async function ensureDefaultLineup(teamId: string) {
     }
   }
 
-  const staffCount = await prisma.staffSlot.count({ where: { teamId } });
-  if (staffCount === 0 && pitchers.length > 0) {
-    const roles = ["SP1", "SP2", "SP3", "SP4", "SP5", "CL", "SU1", "SU2", "LR"];
-    const staff = pitchers.slice(0, roles.length).map((p, i) => ({
-      teamId,
-      playerId: p.id,
-      role: roles[i],
-    }));
-    await prisma.staffSlot.createMany({ data: staff });
+  const existingStaff = await prisma.staffSlot.findMany({ where: { teamId } });
+  const spFilled = ["SP1", "SP2", "SP3", "SP4", "SP5"].filter((role) =>
+    existingStaff.some((s) => s.role === role),
+  ).length;
+  const needsStaffRebuild =
+    pitchers.length >= 5 &&
+    (existingStaff.length === 0 || spFilled < Math.min(5, pitchers.length));
+
+  if (needsStaffRebuild) {
+    const { buildDefaultStaff } = await import("./staff");
+    const slots = buildDefaultStaff(pitchers);
+    await prisma.staffSlot.deleteMany({ where: { teamId } });
+    if (slots.length) {
+      await prisma.staffSlot.createMany({
+        data: slots.map((s) => ({ ...s, teamId })),
+      });
+    }
   }
 }
 
@@ -202,8 +210,34 @@ export async function startSeason(leagueId: string) {
     throw new Error("All teams must mark draft ready");
   }
 
+  const { MIN_PITCHERS, MIN_STARTERS, validateStaffSlots } = await import(
+    "./staff"
+  );
   for (const team of league.teams) {
     await ensureDefaultLineup(team.id);
+    const roster = await prisma.rosterSpot.findMany({
+      where: { teamId: team.id },
+      include: { player: true },
+    });
+    const pitchers = roster.filter((r) => r.player.isPitcher);
+    if (pitchers.length < MIN_PITCHERS) {
+      throw new Error(
+        `${team.abbreviation} needs at least ${MIN_PITCHERS} pitchers (5 SP + bullpen)`,
+      );
+    }
+    const staff = await prisma.staffSlot.findMany({ where: { teamId: team.id } });
+    const staffErr = validateStaffSlots(
+      staff.map((s) => ({ playerId: s.playerId, role: s.role })),
+    );
+    if (staffErr) {
+      throw new Error(`${team.abbreviation}: ${staffErr}`);
+    }
+    const sps = staff.filter((s) => s.role.startsWith("SP"));
+    if (sps.length < MIN_STARTERS) {
+      throw new Error(
+        `${team.abbreviation} needs a ${MIN_STARTERS}-man starting rotation`,
+      );
+    }
   }
 
   const games = buildRoundRobin(
@@ -241,10 +275,18 @@ async function loadTeamSimParts(teamId: string, dayNumber: number) {
     orderBy: { battingOrder: "asc" },
   });
 
-  const staff = await prisma.staffSlot.findMany({
+  let staff = await prisma.staffSlot.findMany({
     where: { teamId },
     include: { player: true },
   });
+  const spCount = staff.filter((s) => s.role.startsWith("SP")).length;
+  if (spCount < 5) {
+    await ensureDefaultLineup(teamId);
+    staff = await prisma.staffSlot.findMany({
+      where: { teamId },
+      include: { player: true },
+    });
+  }
   const rotation = ["SP1", "SP2", "SP3", "SP4", "SP5"]
     .map((role) => staff.find((s) => s.role === role))
     .filter(Boolean);

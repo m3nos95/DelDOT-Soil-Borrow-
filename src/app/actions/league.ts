@@ -98,7 +98,7 @@ export async function createLeagueAction(
       commissionerId: user.id,
       status: "drafting",
       draftPickNumber: 0,
-      draftRounds: 20,
+      draftRounds: 22,
       teams: {
         create: {
           ownerId: user.id,
@@ -301,10 +301,16 @@ export async function setDraftReadyAction(
   }
 
   if (ready) {
+    const { MIN_PITCHERS, countPitcherBuckets } = await import("@/lib/staff");
     const hitters = team.roster.filter((r) => !r.player.isPitcher).length;
-    const pitchers = team.roster.filter((r) => r.player.isPitcher).length;
+    const pitchers = team.roster.filter((r) => r.player.isPitcher);
+    const buckets = countPitcherBuckets(pitchers.map((r) => r.player));
     if (hitters < 10) return { error: "Need at least 10 hitters" };
-    if (pitchers < 6) return { error: "Need at least 6 pitchers" };
+    if (buckets.total < MIN_PITCHERS) {
+      return {
+        error: `Need at least ${MIN_PITCHERS} pitchers (5 starters + bullpen)`,
+      };
+    }
   }
 
   await prisma.team.update({
@@ -422,6 +428,10 @@ export async function saveStaffAction(
   if (slots.some((s) => !pitchers.has(s.playerId))) {
     return { error: "Staff must be pitchers on your roster" };
   }
+
+  const { validateStaffSlots } = await import("@/lib/staff");
+  const staffErr = validateStaffSlots(slots);
+  if (staffErr) return { error: staffErr };
 
   await prisma.$transaction([
     prisma.staffSlot.deleteMany({ where: { teamId: team.id } }),
@@ -640,8 +650,8 @@ export async function cutPlayerAction(
   if (!spot.player.isPitcher && hitters <= 9) {
     return { error: "Need at least 9 hitters" };
   }
-  if (spot.player.isPitcher && pitchers <= 5) {
-    return { error: "Need at least 5 pitchers" };
+  if (spot.player.isPitcher && pitchers <= 8) {
+    return { error: "Need at least 8 pitchers (5 SP + bullpen)" };
   }
 
   await prisma.lineupSlot.deleteMany({ where: { teamId: team.id, playerId } });

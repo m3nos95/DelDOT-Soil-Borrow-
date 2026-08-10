@@ -33,7 +33,7 @@ async function main() {
       maxTeams: 4,
       gamesPerTeam: 8,
       era: "modern",
-      draftRounds: 16,
+      draftRounds: 20,
       commissionerId: user.id,
       status: "drafting",
       teams: {

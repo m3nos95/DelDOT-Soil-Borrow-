@@ -75,8 +75,8 @@ model League {
   seasonNumber    Int      @default(1)
   /// 0-based index of the next snake-draft pick
   draftPickNumber Int      @default(0)
-  /// Picks per team in the snake draft
-  draftRounds     Int      @default(20)
+  /// Picks per team in the snake draft (enough for 9 hitters + 5 SP + bullpen)
+  draftRounds     Int      @default(22)
   playoffSeries   PlayoffSeries[]
   champions       Champion[]
   commissionerId  String

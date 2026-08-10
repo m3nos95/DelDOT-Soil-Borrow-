@@ -129,6 +129,10 @@ export function LineupEditor({
         <h2 className="mb-4 font-[family-name:var(--font-display)] text-3xl tracking-wide">
           Pitching staff
         </h2>
+        <p className="mb-4 text-sm text-[var(--fog)]">
+          Fill SP1–SP5 (they rotate by game day) plus at least three bullpen
+          arms. One ace cannot start every game.
+        </p>
         <div className="space-y-3">
           {staff.map((slot, idx) => (
             <div key={slot.role} className="grid grid-cols-[4rem_1fr] items-center gap-2">
