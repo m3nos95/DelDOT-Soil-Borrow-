@@ -13,12 +13,8 @@ import {
   dynastyEraPlayerWhere,
 } from "./environment";
 import { ensureDefaultLineup } from "./league";
-import {
-  canAffordDraftPick,
-  maxAffordableBid,
-  MIN_PLAYER_SALARY,
-} from "./cap";
-import { MIN_PITCHERS, MIN_RELIEVERS, MIN_STARTERS, pitcherRole } from "./staff";
+import { selectStrategicPick, type DraftCand } from "./draft-strategy";
+import { MIN_PITCHERS, pitcherRole } from "./staff";
 
 type TeamRow = {
   id: string;
@@ -111,15 +107,7 @@ export async function getDraftState(leagueId: string) {
   };
 }
 
-type PoolPlayer = {
-  id: string;
-  name: string;
-  isPitcher: boolean;
-  salary: number;
-  careerWAR: number;
-  durability: number;
-  description: string;
-};
+type PoolPlayer = DraftCand;
 
 async function loadEraPool(eraId: string): Promise<PoolPlayer[]> {
   const era = dynastyEraById(eraId);
@@ -132,33 +120,42 @@ async function loadEraPool(eraId: string): Promise<PoolPlayer[]> {
     careerWAR: true,
     durability: true,
     description: true,
+    primaryPos: true,
+    positions: true,
+    stuff: true,
   } as const;
 
-  // Stars by WAR + a deep cheap-arm slice so 5 SP + bullpen can finish under cap
-  const [byWar, cheapArms, solidBats] = await Promise.all([
+  // Stars by WAR + deep cheap slices so construction + late picks can finish
+  const [byWar, cheapArms, cheapBats, midBats] = await Promise.all([
     prisma.player.findMany({
       where: eraWhere,
       orderBy: [{ careerWAR: "desc" }, { salary: "desc" }],
-      take: 1000,
+      take: 1500,
       select,
     }),
     prisma.player.findMany({
       where: { ...eraWhere, isPitcher: true },
       orderBy: [{ salary: "asc" }, { careerWAR: "desc" }],
-      take: 1200,
+      take: 1500,
       select,
     }),
     prisma.player.findMany({
       where: { ...eraWhere, isPitcher: false },
       orderBy: [{ salary: "asc" }, { careerWAR: "desc" }],
-      take: 400,
+      take: 800,
+      select,
+    }),
+    prisma.player.findMany({
+      where: { ...eraWhere, isPitcher: false },
+      orderBy: [{ careerWAR: "desc" }],
+      take: 800,
       select,
     }),
   ]);
 
   const seen = new Set<string>();
   const merged: PoolPlayer[] = [];
-  for (const p of [...byWar, ...cheapArms, ...solidBats]) {
+  for (const p of [...byWar, ...midBats, ...cheapArms, ...cheapBats]) {
     if (seen.has(p.id)) continue;
     seen.add(p.id);
     merged.push(p);
@@ -180,13 +177,23 @@ export async function pickBpaForTeam(opts: {
   const league = await prisma.league.findUnique({ where: { id: leagueId } });
   const draftRounds = opts.draftRounds ?? league?.draftRounds ?? 22;
 
-  const roster = await prisma.rosterSpot.findMany({
+  const rosterRows = await prisma.rosterSpot.findMany({
     where: { teamId },
     include: { player: true },
   });
-  let payroll = roster.reduce((s, r) => s + r.player.salary, 0);
-  let hitters = roster.filter((r) => !r.player.isPitcher).length;
-  let pitchers = roster.filter((r) => r.player.isPitcher).length;
+  const roster: DraftCand[] = rosterRows.map((r) => ({
+    id: r.player.id,
+    name: r.player.name,
+    isPitcher: r.player.isPitcher,
+    salary: r.player.salary,
+    careerWAR: r.player.careerWAR,
+    durability: r.player.durability,
+    description: r.player.description,
+    primaryPos: r.player.primaryPos,
+    positions: r.player.positions,
+    stuff: r.player.stuff,
+  }));
+  const payroll = roster.reduce((s, p) => s + p.salary, 0);
 
   if (roster.length >= draftRounds || roster.length >= 25) return null;
 
@@ -202,144 +209,37 @@ export async function pickBpaForTeam(opts: {
     );
 
   const pool = opts.pool ?? (await loadEraPool(eraId));
-  const maxBid = maxAffordableBid(
-    payroll,
-    salaryCap,
-    roster.length,
-    draftRounds,
-  );
 
-  // Construction: 9 hitters, then 5 SP + 3 RP (Randy can't start 162).
-  const rosterPitchers = roster
-    .filter((r) => r.player.isPitcher)
-    .map((r) => r.player);
-  const spCount = rosterPitchers.filter((p) => pitcherRole(p) === "SP").length;
-  const rpCount = rosterPitchers.filter((p) => pitcherRole(p) === "RP").length;
-
-  const forceHitter = hitters < 9;
-  const forceStarter = !forceHitter && spCount < MIN_STARTERS;
-  const forceReliever =
-    !forceHitter && !forceStarter && rpCount < MIN_RELIEVERS;
-  const forcePitcher =
-    !forceHitter &&
-    !forceStarter &&
-    !forceReliever &&
-    pitchers < MIN_PITCHERS;
-  const building =
-    forceHitter || forceStarter || forceReliever || forcePitcher;
-  // Keep powder dry until the full 5 SP + 3 RP are rostered
-  const reserve = forceStarter
-    ? 20_000_000
-    : forceReliever
-      ? 8_000_000
-      : building
-        ? 4_000_000
-        : 10_000_000;
-
-  const efficiency = (p: PoolPlayer) =>
-    p.careerWAR / Math.max(1, p.salary / 1_000_000) +
-    ((p.name.charCodeAt(0) + seed) % 7) * 0.01;
-
-  const fitsCaps = (p: PoolPlayer, softReserve: number) => {
-    if (takenSet.has(p.id)) return false;
-    if (p.salary > maxBid) return false;
-    if (payroll + p.salary > salaryCap - softReserve) return false;
-    if (!p.isPitcher && hitters >= 14) return false;
-    if (p.isPitcher && pitchers >= 11) return false;
-    const gate = canAffordDraftPick({
+  // Retry a few times if another team snagged the player mid-pick
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const pick = selectStrategicPick({
+      roster,
+      pool,
+      taken: takenSet,
       payroll,
       salaryCap,
-      rosterLen: roster.length,
       draftRounds,
-      pickSalary: p.salary,
-      hitters,
-      pitchers,
-      pickingPitcher: p.isPitcher,
+      seed: seed + attempt * 17,
     });
-    return gate.ok;
-  };
+    if (!pick) return null;
 
-  const roleOk = (p: PoolPlayer) => {
-    if (forceHitter && p.isPitcher) return false;
-    if (forceStarter) {
-      return p.isPitcher && pitcherRole(p) === "SP";
-    }
-    if (forceReliever) {
-      return p.isPitcher && pitcherRole(p) === "RP";
-    }
-    if (forcePitcher && !p.isPitcher) return false;
-    return true;
-  };
-
-  const pickFrom = (softReserve: number, enforceRole: boolean) => {
-    // During rotation/pen construction, stay mid-tier so cap room remains
-    // for all 5 SP + bullpen (no $32M Randy-then-broke roster).
-    const softCap = Math.min(
-      maxBid,
-      forceStarter
-        ? 9_000_000
-        : forceReliever
-          ? 6_000_000
-          : building
-            ? 10_000_000
-            : 18_000_000,
-    );
-    const candidates = pool
-      .filter((p) => fitsCaps(p, softReserve) && (!enforceRole || roleOk(p)))
-      .sort((a, b) => {
-        if (building) {
-          const ea = efficiency(a) - a.salary / 25_000_000;
-          const eb = efficiency(b) - b.salary / 25_000_000;
-          return eb - ea;
-        }
-        return efficiency(b) - efficiency(a);
+    try {
+      await prisma.rosterSpot.create({
+        data: { teamId, playerId: pick.id, leagueId },
       });
-    return (
-      candidates.find((p) => p.salary <= softCap) ?? candidates[0] ?? null
-    );
-  };
-
-  const anyPitcher = (softReserve: number) => {
-    const candidates = pool
-      .filter((p) => p.isPitcher && fitsCaps(p, softReserve))
-      .sort((a, b) => efficiency(b) - efficiency(a));
-    return candidates[0] ?? null;
-  };
-
-  const cheapestPitcher = () =>
-    pool
-      .filter(
-        (p) =>
-          p.isPitcher &&
-          !takenSet.has(p.id) &&
-          p.salary <= Math.max(maxBid, MIN_PLAYER_SALARY) &&
-          payroll + p.salary <= salaryCap &&
-          pitchers < 11,
-      )
-      .sort(
-        (a, b) => a.salary - b.salary || b.careerWAR - a.careerWAR,
-      )[0] ?? null;
-
-  const pick =
-    pickFrom(reserve, true) ??
-    pickFrom(0, true) ??
-    // If the SP/RP pool is thin under the cap, still take an arm — never a bat
-    (forceStarter || forceReliever || forcePitcher
-      ? anyPitcher(0)
-      : null) ??
-    (building ? cheapestPitcher() : null) ??
-    pickFrom(0, false);
-  if (!pick) return null;
-
-  try {
-    await prisma.rosterSpot.create({
-      data: { teamId, playerId: pick.id, leagueId },
-    });
-  } catch {
-    return null;
+      takenSet.add(pick.id);
+      return pick;
+    } catch {
+      // League exclusivity race / stale taken set — refresh and retry
+      takenSet.add(pick.id);
+      const live = await prisma.rosterSpot.findMany({
+        where: { leagueId },
+        select: { playerId: true },
+      });
+      for (const row of live) takenSet.add(row.playerId);
+    }
   }
-  takenSet.add(pick.id);
-  return pick;
+  return null;
 }
 
 async function markDraftComplete(leagueId: string, teams: TeamRow[]) {
@@ -357,18 +257,25 @@ async function markDraftComplete(leagueId: string, teams: TeamRow[]) {
 /**
  * Make CPU picks while a CPU team is on the clock.
  * Stops when a human is on the clock or the draft is done.
+ * Pass a shared `takenSet` when chaining with human auto-draft so exclusivity stays live.
  */
-export async function advanceCpuPicks(leagueId: string, maxPicks = 40) {
+export async function advanceCpuPicks(
+  leagueId: string,
+  maxPicks = 40,
+  sharedTaken?: Set<string>,
+) {
   let made = 0;
   let pool: PoolPlayer[] | undefined;
-  const takenSet = new Set(
-    (
-      await prisma.rosterSpot.findMany({
-        where: { leagueId },
-        select: { playerId: true },
-      })
-    ).map((t) => t.playerId),
-  );
+  const takenSet =
+    sharedTaken ??
+    new Set(
+      (
+        await prisma.rosterSpot.findMany({
+          where: { leagueId },
+          select: { playerId: true },
+        })
+      ).map((t) => t.playerId),
+    );
 
   for (let i = 0; i < maxPicks; i++) {
     const state = await getDraftState(leagueId);
@@ -457,14 +364,30 @@ async function topUpPitching(leagueId: string, eraId: string, salaryCap: number)
   for (const team of teams) {
     let roster = [...team.roster];
     let guard = 0;
-    while (guard++ < 30) {
-      const pitcherCount = roster.filter((r) => r.player.isPitcher).length;
-      if (pitcherCount >= MIN_PITCHERS) break;
+    while (guard++ < 40) {
+      const arms = roster.filter((r) => r.player.isPitcher);
+      const sps = arms.filter((r) => pitcherRole(r.player) === "SP");
+      const rps = arms.filter((r) => pitcherRole(r.player) === "RP");
+      const needSp = Math.max(0, 5 - sps.length);
+      const needRp = Math.max(0, 3 - rps.length);
+      if (needSp + needRp === 0 && arms.length >= MIN_PITCHERS) break;
 
+      const wantRp = needRp > 0 && (needSp === 0 || rps.length < needSp);
       let payroll = roster.reduce((s, r) => s + r.player.salary, 0);
-      let next = cheapArms.find(
-        (p) => !taken.has(p.id) && payroll + p.salary <= salaryCap,
-      );
+      let next = cheapArms.find((p) => {
+        if (taken.has(p.id)) return false;
+        if (payroll + p.salary > salaryCap) return false;
+        const role = pitcherRole(p);
+        if (wantRp) return role === "RP";
+        if (needSp > 0) return role === "SP";
+        return true;
+      });
+      // Fallback: any affordable arm if role filter found nothing
+      if (!next) {
+        next = cheapArms.find(
+          (p) => !taken.has(p.id) && payroll + p.salary <= salaryCap,
+        );
+      }
 
       if (!next) {
         // Free cap: cut the priciest expendable player (keep 9H / 5P floors)
@@ -479,8 +402,11 @@ async function topUpPitching(leagueId: string, eraId: string, salaryCap: number)
               b.player.salary - a.player.salary ||
               (a.player.careerWAR ?? 0) - (b.player.careerWAR ?? 0),
           );
-        // If locked at 9H/5+P, still cut the lowest-WAR starter to rebuild the pen
+        // Prefer cutting extra SP when we're short on RP
         const cut =
+          (needRp > 0
+            ? cuttable.find((r) => pitcherRole(r.player) === "SP")
+            : undefined) ??
           cuttable[0] ??
           roster
             .filter((r) => r.player.isPitcher)
@@ -581,17 +507,19 @@ export async function runSnakeDraftToCompletion(leagueId: string) {
 }
 
 /**
- * Auto-draft for a human team: whenever they're on the clock, BPA-pick;
- * advance CPU in between. Stops if another human is on the clock.
+ * Auto-draft for a human team until their roster hits draftRounds (or the
+ * whole snake finishes). Uses strategic picks; never burns a turn empty.
+ * Pauses only if another human is on the clock.
  */
 export async function autoDraftHumanTeam(opts: {
   leagueId: string;
   teamId: string;
 }) {
   const { leagueId, teamId } = opts;
-  const pool = await loadEraPool(
-    (await prisma.league.findUniqueOrThrow({ where: { id: leagueId } })).era,
-  );
+  const league = await prisma.league.findUniqueOrThrow({
+    where: { id: leagueId },
+  });
+  const pool = await loadEraPool(league.era);
   const takenSet = new Set(
     (
       await prisma.rosterSpot.findMany({
@@ -602,14 +530,30 @@ export async function autoDraftHumanTeam(opts: {
   );
 
   let picks = 0;
-  for (let i = 0; i < 400; i++) {
-    await advanceCpuPicks(leagueId, 30);
+  let stuckStreak = 0;
+  for (let i = 0; i < 800; i++) {
+    // Share takenSet so CPU exclusivity stays in sync with human auto-draft
+    await advanceCpuPicks(leagueId, 40, takenSet);
     const state = await getDraftState(leagueId);
+
+    const mySpots = await prisma.rosterSpot.count({ where: { teamId } });
+    if (mySpots >= state.rounds) {
+      // Still advance the rest of the board so the draft can complete
+      await advanceCpuPicks(leagueId, 200, takenSet);
+      const done = await getDraftState(leagueId);
+      return { picks, complete: done.complete, rosterSize: mySpots };
+    }
+
     if (state.complete) {
-      return { picks, complete: true as const };
+      return { picks, complete: true as const, rosterSize: mySpots };
     }
     if (!state.onClock) {
-      return { picks, complete: false as const, waitingOn: null };
+      return {
+        picks,
+        complete: false as const,
+        waitingOn: null,
+        rosterSize: mySpots,
+      };
     }
     if (state.onClock.id !== teamId) {
       if (state.onClock.isCpu) continue;
@@ -617,6 +561,7 @@ export async function autoDraftHumanTeam(opts: {
         picks,
         complete: false as const,
         waitingOn: state.onClock.abbreviation,
+        rosterSize: mySpots,
       };
     }
 
@@ -626,18 +571,28 @@ export async function autoDraftHumanTeam(opts: {
       eraId: state.league.era,
       salaryCap: state.league.salaryCap,
       draftRounds: state.rounds,
-      seed: state.pickNumber + 11,
+      seed: state.pickNumber + 11 + picks,
       pool,
       takenSet,
     });
     if (!pick) {
-      // Skip rather than hang — rare cap/pool edge case
-      await prisma.league.update({
-        where: { id: leagueId },
-        data: { draftPickNumber: state.pickNumber + 1 },
+      // Refresh taken from DB and retry once before declaring stuck
+      stuckStreak += 1;
+      const live = await prisma.rosterSpot.findMany({
+        where: { leagueId },
+        select: { playerId: true },
       });
-      continue;
+      for (const row of live) takenSet.add(row.playerId);
+      if (stuckStreak < 3) continue;
+      return {
+        picks,
+        complete: false as const,
+        waitingOn: null,
+        rosterSize: mySpots,
+        stuck: true as const,
+      };
     }
+    stuckStreak = 0;
     picks += 1;
     await prisma.league.update({
       where: { id: leagueId },
@@ -646,6 +601,8 @@ export async function autoDraftHumanTeam(opts: {
   }
 
   const after = await getDraftState(leagueId);
-  return { picks, complete: after.complete };
+  const rosterSize = await prisma.rosterSpot.count({ where: { teamId } });
+  return { picks, complete: after.complete, rosterSize };
 }
+
 

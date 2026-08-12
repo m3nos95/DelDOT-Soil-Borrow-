@@ -294,23 +294,35 @@ export async function autoDraftMyTeamAction(
   revalidatePath(`/league/${leagueId}`);
   revalidatePath(`/league/${leagueId}/draft`);
 
+  if (res.stuck) {
+    return {
+      ok: true,
+      message: `Auto-drafted ${res.picks} · stuck on cap/pool with ${res.rosterSize} players`,
+    };
+  }
   if (res.complete) {
     return {
       ok: true,
-      message: `Auto-drafted ${res.picks} pick${res.picks === 1 ? "" : "s"} — draft complete`,
+      message: `Built your club (${res.rosterSize} players, ${res.picks} auto picks) — draft complete`,
     };
   }
   if (res.waitingOn) {
     return {
       ok: true,
-      message: `Auto-drafted ${res.picks} · waiting on ${res.waitingOn}`,
+      message: `Built toward a full roster (${res.rosterSize} players, +${res.picks}) · waiting on ${res.waitingOn}`,
+    };
+  }
+  if (res.rosterSize >= team.league.draftRounds) {
+    return {
+      ok: true,
+      message: `Roster filled (${res.rosterSize}/${team.league.draftRounds})`,
     };
   }
   return {
     ok: true,
     message: res.picks
-      ? `Auto-drafted ${res.picks} pick${res.picks === 1 ? "" : "s"}`
-      : "No picks made yet",
+      ? `Auto-drafted ${res.picks} · roster at ${res.rosterSize}`
+      : "No picks made yet — fill CPU / wait for your turn",
   };
 }
 
