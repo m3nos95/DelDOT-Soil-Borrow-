@@ -89,11 +89,17 @@ export default async function DraftPage({
       ownerByPlayer.set(spot.playerId, team.abbreviation);
     }
   }
+  const takenIds = [...ownerByPlayer.keys()];
   const myRosterSet = new Set(myTeam.roster.map((r) => r.playerId));
   const payroll = myTeam.roster.reduce((s, r) => s + r.player.salary, 0);
   const era = dynastyEraById(league.era);
   const eraWhere = dynastyEraPlayerWhere(era);
-  const poolCount = await prisma.player.count({ where: eraWhere });
+  const poolCount = await prisma.player.count({
+    where: {
+      ...eraWhere,
+      ...(takenIds.length ? { id: { notIn: takenIds } } : {}),
+    },
+  });
 
   let players: {
     id: string;
@@ -118,6 +124,7 @@ export default async function DraftPage({
     const where = {
       isPitcher: tab === "pitchers",
       ...eraWhere,
+      ...(takenIds.length ? { id: { notIn: takenIds } } : {}),
       ...(q
         ? {
             OR: [
@@ -159,6 +166,8 @@ export default async function DraftPage({
           leagueId={id}
           salaryCap={league.salaryCap}
           payroll={payroll}
+          rosterSize={myTeam.roster.length}
+          draftRounds={league.draftRounds}
           draftReady={myTeam.draftReady}
           locked={league.status !== "drafting"}
           tab={tab}

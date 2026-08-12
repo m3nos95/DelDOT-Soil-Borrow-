@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
+import { DeleteLeagueButton } from "@/components/DeleteLeagueButton";
 import { InviteCode } from "@/components/InviteCode";
 import { LeagueNav } from "@/components/LeagueNav";
 import { CommissionerStart, SimDayButton } from "@/components/SeasonControls";
@@ -77,6 +78,12 @@ export default async function LeaguePage({
               {league.teams.length}/{league.maxTeams} teams
             </span>
             <span className="stat-mono">{formatSalary(league.salaryCap)} cap</span>
+            {league.commissionerId === session.id ? (
+              <DeleteLeagueButton
+                leagueId={id}
+                leagueName={league.name}
+              />
+            ) : null}
           </div>
         </div>
 

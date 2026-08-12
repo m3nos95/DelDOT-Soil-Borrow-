@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { ClubhouseActions } from "@/components/ClubhouseActions";
+import { DeleteLeagueButton } from "@/components/DeleteLeagueButton";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { dynastyEraById } from "@/lib/environment";
@@ -12,7 +13,7 @@ export default async function ClubhousePage() {
   if (!session) redirect("/login");
 
   const teams = await prisma.team.findMany({
-    where: { ownerId: session.id },
+    where: { ownerId: session.id, isCpu: false },
     include: { league: true },
     orderBy: { createdAt: "desc" },
   });
@@ -41,34 +42,42 @@ export default async function ClubhousePage() {
             <div className="border-t border-[var(--line)]">
               {teams.map((team) => {
                 const era = dynastyEraById(team.league.era);
+                const isCommish = team.league.commissionerId === session.id;
                 return (
-                  <Link
+                  <div
                     key={team.id}
-                    href={`/league/${team.leagueId}`}
-                    className="league-row"
+                    className="league-row flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                      <div>
-                        <div className="font-[family-name:var(--font-display)] text-3xl tracking-wide sm:text-4xl">
-                          {team.league.name}
-                        </div>
-                        <div className="mt-1.5 text-sm text-[var(--fog)]">
-                          <span className="text-[var(--chalk)]">
-                            {team.abbreviation}
-                          </span>
-                          {" · "}
-                          {era.label}
-                        </div>
+                    <Link
+                      href={`/league/${team.leagueId}`}
+                      className="min-w-0 flex-1"
+                    >
+                      <div className="font-[family-name:var(--font-display)] text-3xl tracking-wide sm:text-4xl">
+                        {team.league.name}
                       </div>
-                      <div className="font-[family-name:var(--font-display)] text-sm tracking-[0.14em] uppercase text-[var(--fog)]">
-                        {team.league.status}
+                      <div className="mt-1.5 text-sm text-[var(--fog)]">
+                        <span className="text-[var(--chalk)]">
+                          {team.abbreviation}
+                        </span>
+                        {" · "}
+                        {era.label}
+                        {" · "}
+                        <span className="uppercase tracking-[0.12em]">
+                          {team.league.status}
+                        </span>
                         {team.league.status === "season" ||
                         team.league.status === "complete"
                           ? ` · ${formatRecord(team.wins, team.losses)}`
                           : ""}
                       </div>
-                    </div>
-                  </Link>
+                    </Link>
+                    {isCommish ? (
+                      <DeleteLeagueButton
+                        leagueId={team.leagueId}
+                        leagueName={team.league.name}
+                      />
+                    ) : null}
+                  </div>
                 );
               })}
             </div>

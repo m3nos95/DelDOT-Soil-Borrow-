@@ -26,6 +26,7 @@
     "test:salaries": "tsx scripts/test-salaries.ts",
     "test:draft": "tsx scripts/test-draft.ts",
     "test:staff": "tsx scripts/test-staff.ts",
+    "test:cap": "tsx scripts/test-cap.ts",
     "gg:fetch": "python3 scripts/fetch_gold_gloves.py",
     "gg:apply": "python3 scripts/apply_gold_gloves.py && tsx scripts/sync_gold_gloves_db.ts",
     "demo:build": "node scripts/build-demo.mjs",
