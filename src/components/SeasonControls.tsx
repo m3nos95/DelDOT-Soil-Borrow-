@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   fillCpuTeamsAction,
+  randomizeDraftOrderAction,
   setDraftReadyAction,
   simDayAction,
   simWeekAction,
@@ -13,10 +14,12 @@ export function CommissionerStart({
   leagueId,
   canStart,
   canFillCpu,
+  canRandomizeDraft,
 }: {
   leagueId: string;
   canStart: boolean;
   canFillCpu?: boolean;
+  canRandomizeDraft?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -41,6 +44,23 @@ export function CommissionerStart({
           {pending ? "Filling…" : "Fill open slots with CPU"}
         </button>
       ) : null}
+      {canRandomizeDraft ? (
+        <button
+          className="btn btn-ghost"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              setError(null);
+              setMessage(null);
+              const res = await randomizeDraftOrderAction(leagueId);
+              if (res?.error) setError(res.error);
+              else setMessage(res.message ?? "Draft order randomized");
+            })
+          }
+        >
+          {pending ? "Shuffling…" : "Randomize draft order"}
+        </button>
+      ) : null}
       <button
         className="btn btn-primary"
         disabled={!canStart || pending}
@@ -56,12 +76,12 @@ export function CommissionerStart({
       </button>
       {!canStart ? (
         <p className="text-sm text-[var(--fog)]">
-          Lock human rosters first. Starting auto-fills any empty slots with CPU
-          clubs (162-game schedule by default).
+          Finish the snake draft first. Round 1 order is a lottery; last pick
+          snakes back first in round 2.
         </p>
       ) : (
         <p className="text-sm text-[var(--fog)]">
-          Empty slots become CPU teams with auto-drafted rosters.
+          Draft complete — start the season when ready.
         </p>
       )}
       {message ? <p className="text-sm text-[var(--foul)]">{message}</p> : null}

@@ -108,6 +108,10 @@ export default async function LeaguePage({
               <h2 className="mb-3 font-[family-name:var(--font-display)] text-3xl tracking-wide">
                 Draft board
               </h2>
+              <p className="mb-3 text-sm text-[var(--fog)]">
+                Snake draft — round 1 order is a lottery. Slot #30 picks last in
+                round 1 and first in round 2.
+              </p>
               <ul className="mb-5 space-y-2 text-sm">
                 {[...league.teams]
                   .sort((a, b) => a.draftOrder - b.draftOrder)
@@ -150,11 +154,14 @@ export default async function LeaguePage({
                         league.teams.length * league.draftRounds)
                   }
                   canFillCpu={openSlots > 0 && league.draftPickNumber === 0}
+                  canRandomizeDraft={
+                    league.teams.length >= 2 && league.draftPickNumber === 0
+                  }
                 />
               ) : (
                 <p className="text-sm text-[var(--fog)]">
-                  Commissioner starts after the snake draft finishes. Empty
-                  slots become CPU before pick 1.
+                  Commissioner starts after the snake draft finishes. Round 1
+                  order is random; pick #N snakes to first in round 2.
                 </p>
               )}
             </div>

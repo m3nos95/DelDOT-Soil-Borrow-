@@ -29,11 +29,39 @@ type TeamRow = {
   name: string;
 };
 
-export async function reassignDraftOrders(leagueId: string) {
+/**
+ * Assign draftOrder 0…N-1.
+ * - shuffle: random lottery for round-1 order (only before pick 1)
+ * - stable: keep current relative order, just renumber gaps
+ *
+ * Once draftPickNumber > 0, order is locked.
+ */
+export async function reassignDraftOrders(
+  leagueId: string,
+  mode: "stable" | "shuffle" = "stable",
+) {
+  const league = await prisma.league.findUnique({ where: { id: leagueId } });
+  if (!league) return 0;
+  if (league.draftPickNumber > 0) {
+    return (
+      await prisma.team.count({ where: { leagueId } })
+    );
+  }
+
   const teams = await prisma.team.findMany({
     where: { leagueId },
-    orderBy: [{ createdAt: "asc" }, { abbreviation: "asc" }],
+    orderBy: [{ draftOrder: "asc" }, { createdAt: "asc" }, { abbreviation: "asc" }],
   });
+
+  if (mode === "shuffle") {
+    for (let i = teams.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = teams[i];
+      teams[i] = teams[j];
+      teams[j] = tmp;
+    }
+  }
+
   for (let i = 0; i < teams.length; i++) {
     if (teams[i].draftOrder !== i) {
       await prisma.team.update({
@@ -487,7 +515,7 @@ async function topUpPitching(leagueId: string, eraId: string, salaryCap: number)
 
 /** Test/seed helper: snake-draft BPA for every remaining pick. */
 export async function runSnakeDraftToCompletion(leagueId: string) {
-  await reassignDraftOrders(leagueId);
+  await reassignDraftOrders(leagueId, "stable");
   const boot = await getDraftState(leagueId);
   const pool = await loadEraPool(boot.league.era);
   const takenSet = new Set(

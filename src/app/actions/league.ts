@@ -162,7 +162,7 @@ export async function joinLeagueAction(
       draftOrder: league.teams.length,
     },
   });
-  await reassignDraftOrders(league.id);
+  await reassignDraftOrders(league.id, "shuffle");
 
   redirect(`/league/${league.id}`);
 }
@@ -406,12 +406,35 @@ export async function fillCpuTeamsAction(leagueId: string): Promise<ActionState>
     return {
       ok: true,
       message: res.created
-        ? `Filled ${res.created} CPU team${res.created === 1 ? "" : "s"}`
-        : "League already full",
+        ? `Filled ${res.created} CPU team${res.created === 1 ? "" : "s"} · draft order randomized`
+        : "League already full · draft order re-randomized",
     };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Could not fill CPU teams" };
   }
+}
+
+/** Commissioner: re-roll round-1 lottery before pick 1. */
+export async function randomizeDraftOrderAction(
+  leagueId: string,
+): Promise<ActionState> {
+  const user = await mustUser();
+  const league = await prisma.league.findUnique({ where: { id: leagueId } });
+  if (!league) return { error: "League not found" };
+  if (league.commissionerId !== user.id) {
+    return { error: "Only the commissioner can randomize draft order" };
+  }
+  if (league.status !== "drafting") return { error: "Draft is closed" };
+  if (league.draftPickNumber > 0) {
+    return { error: "Draft already started — order is locked" };
+  }
+  const n = await reassignDraftOrders(leagueId, "shuffle");
+  revalidatePath(`/league/${leagueId}`);
+  revalidatePath(`/league/${leagueId}/draft`);
+  return {
+    ok: true,
+    message: `Randomized round-1 order for ${n} teams (last pick snakes back first in round 2)`,
+  };
 }
 
 export async function startSeasonAction(leagueId: string): Promise<ActionState> {

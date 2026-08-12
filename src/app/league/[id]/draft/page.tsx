@@ -59,7 +59,8 @@ export default async function DraftPage({
   }
 
   if (league.status === "drafting" && league.draftPickNumber === 0) {
-    await reassignDraftOrders(id);
+    // Keep order stable on refresh — lottery runs on join / fill CPU / randomize
+    await reassignDraftOrders(id, "stable");
   }
   if (league.status === "drafting") {
     await advanceCpuPicks(id);

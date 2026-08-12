@@ -191,7 +191,7 @@ export function DraftBoard({
         {clock.order.length ? (
           <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--fog)]">
             <span className="font-[family-name:var(--font-display)] tracking-[0.12em] uppercase">
-              Order
+              Rd1 order (snakes)
             </span>
             {clock.order.map((t, i) => (
               <span

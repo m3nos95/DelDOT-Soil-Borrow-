@@ -207,7 +207,7 @@ export async function fillCpuTeams(leagueId: string) {
   const open = FRANCHISES.filter((f) => !takenCodes.has(f.code));
   const need = league.maxTeams - league.teams.length;
   if (need <= 0) {
-    await reassignDraftOrders(leagueId);
+    await reassignDraftOrders(leagueId, "shuffle");
     return { created: 0 };
   }
 
@@ -228,7 +228,8 @@ export async function fillCpuTeams(leagueId: string) {
     });
     created.push(team.id);
   }
-  await reassignDraftOrders(leagueId);
+  // Lottery the round-1 order once the board is full / CPU padded
+  await reassignDraftOrders(leagueId, "shuffle");
   return { created: created.length };
 }
 

@@ -1,8 +1,8 @@
 /**
  * Snake-draft helpers.
  *
- * Round 0: teams 0 → N-1
- * Round 1: teams N-1 → 0
+ * Round 1 (even): teams 0 → N-1  (slot #1 picks first, #N picks last)
+ * Round 2 (odd):  teams N-1 → 0  (slot #N / last rd1 pick goes first)
  * …
  */
 
