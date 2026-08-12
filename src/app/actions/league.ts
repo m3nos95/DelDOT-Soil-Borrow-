@@ -272,7 +272,7 @@ export async function syncDraftClockAction(
   };
 }
 
-/** Auto-pick the rest of your snake draft (BPA while you're on the clock). */
+/** Auto-build your snake-draft roster (needs-based strategy while on the clock). */
 export async function autoDraftMyTeamAction(
   leagueId: string,
 ): Promise<ActionState> {
