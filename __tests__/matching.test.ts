@@ -1,6 +1,6 @@
 import { extractNofoCriteria } from "../lib/extract-nofo";
 import { matchProjects, scoreProject } from "../lib/matching";
-import { SAMPLE_SS4A_NOFO, SAMPLE_BRIDGE_NOFO } from "../lib/sample-nofo";
+import { SAMPLE_SS4A_NOFO, SAMPLE_BRIDGE_NOFO, SAMPLE_RAISE_NOFO } from "../lib/sample-nofo";
 import { getUnfundedProjects, TARGET_PROJECT_COUNT } from "../lib/sample-projects";
 import { describe, expect, it } from "vitest";
 
@@ -56,6 +56,14 @@ describe("matching engine", () => {
       },
     ]);
     expect(penalized.score).toBeLessThan(baseline.score);
+  });
+
+  it("ranks complete-streets highly for RAISE", () => {
+    const projects = getUnfundedProjects();
+    const criteria = extractNofoCriteria(SAMPLE_RAISE_NOFO, "raise.pdf");
+    const matches = matchProjects(projects, criteria);
+    expect(matches[0]?.score).toBeGreaterThanOrEqual(70);
+    expect(matches[0]?.projectName.toLowerCase()).toMatch(/complete streets|multimodal|transit|downtown/);
   });
 
   it("prefers bundled bridges for BIP", () => {

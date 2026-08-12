@@ -118,6 +118,14 @@ function evaluationScore(project: Project, criteria: NofoCriteria, tokens: Set<s
   if (criteria.programCode === "BRIDGE" && project.category === "bridge") score += 22;
   if (criteria.programCode === "PROTECT" && project.tags.some((t) => /flood|coastal|evac/i.test(t))) score += 18;
   if (criteria.programCode === "CFI" && project.category === "ev-charging") score += 22;
+  if (criteria.programCode === "RAISE") {
+    if (["complete-streets", "transit", "bike-ped"].includes(project.category)) score += 20;
+    if (project.equity.disadvantagedCommunity) score += 8;
+    if (project.modes.length >= 3) score += 8;
+  }
+  if (criteria.programCode === "INFRA" && (project.category === "freight" || project.tags.includes("interstate"))) {
+    score += 18;
+  }
   score *= 0.55 + 0.45 * typeFit(project, criteria);
   return clamp(score);
 }
