@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HARDBALL — local sim demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Pixelify+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #050d0a;
+      --bg1: #0c2218;
+      --chalk: #f3efe4;
+      --amber: #e8b84a;
+      --muted: #a8b0a4;
+      --line: rgba(243, 239, 228, 0.12);
+      --pix: "Pixelify Sans", "IBM Plex Mono", monospace;
+      --bit-grass-a: #1f6b3a;
+      --bit-grass-b: #175530;
+      --bit-dirt: #c49a4a;
+      --bit-dirt-dk: #8a6a2e;
+      --bit-wall: #3a2a18;
+      --bit-sky: #142038;
+      --bit-ui: #101820;
+      --bit-edge: #f0d060;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Source Serif 4", Georgia, serif;
+      color: var(--chalk);
+      background:
+        radial-gradient(ellipse 100% 58% at 55% -12%, rgba(232, 184, 74, 0.14), transparent 56%),
+        radial-gradient(ellipse 55% 40% at 92% 8%, rgba(70, 120, 180, 0.12), transparent 52%),
+        radial-gradient(ellipse 70% 48% at 0% 22%, rgba(22, 70, 44, 0.55), transparent 52%),
+        radial-gradient(ellipse 60% 42% at 100% 85%, rgba(184, 90, 40, 0.1), transparent 48%),
+        linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #0a1410);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    .brand {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: clamp(4.5rem, 16vw, 8rem);
+      letter-spacing: 0.02em;
+      line-height: 0.82;
+      margin: 0;
+      animation: rise 0.8s ease-out both;
+      position: relative;
+    }
+    .brand::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 40%;
+      bottom: -8px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--amber), transparent);
+      animation: sweep 3.2s ease-in-out infinite;
+    }
+    @keyframes sweep {
+      0%, 100% { opacity: 0.25; transform: scaleX(0.4); }
+      50% { opacity: 1; transform: scaleX(1); }
+    }
+
+    .tag {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin: 0.75rem 0 0;
+      animation: rise 0.8s ease-out 0.1s both;
+    }
+
+    .lede {
+      max-width: 36rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.55;
+      margin: 1.25rem 0 2rem;
+      animation: rise 0.8s ease-out 0.18s both;
+    }
+
+    .panel {
+      border-top: 1px solid var(--line);
+      padding-top: 1.5rem;
+      animation: rise 0.8s ease-out 0.25s both;
+    }
+
+    .row { display: grid; gap: 1rem; }
+    @media (min-width: 640px) {
+      .row.two { grid-template-columns: 1fr 1fr; }
+    }
+
+    label {
+      display: block;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    select, button { font: inherit; }
+
+    select {
+      width: 100%;
+      background: transparent;
+      color: var(--chalk);
+      border: none;
+      border-bottom: 1px solid var(--line);
+      padding: 0.85rem 0;
+      border-radius: 0;
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.05rem;
+    }
+    select:focus {
+      outline: none;
+      border-bottom-color: var(--amber);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    button {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: 1.05rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+      cursor: pointer;
+      padding: 0.85rem 1.4rem;
+      transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button.primary {
+      background: var(--amber);
+      color: #050d0a;
+    }
+    button.primary:hover { background: #f0c75c; }
+    button.ghost {
+      background: transparent;
+      color: var(--chalk);
+      border-color: var(--line);
+    }
+    button.ghost:hover { border-color: rgba(243,239,228,0.4); color: var(--amber); }
+
+    .note {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 1rem;
+      line-height: 1.5;
+    }
+    .note code {
+      color: var(--chalk);
+      background: rgba(0,0,0,0.25);
+      padding: 0.1rem 0.35rem;
+    }
+
+    .rosters {
+      display: none;
+      margin-top: 1.5rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .rosters.show { display: grid; gap: 1.25rem; }
+    @media (min-width: 640px) {
+      .rosters.show { grid-template-columns: 1fr 1fr; }
+    }
+    .rosters strong { color: var(--chalk); font-weight: 500; }
+
+    .scoreboard {
+      display: none;
+      margin-top: 2rem;
+      border-top: 1px solid var(--line);
+      padding-top: 1.5rem;
+      animation: rise 0.5s ease-out both;
+    }
+    .scoreboard.show { display: block; }
+
+    .final {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+    .final .matchup {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: clamp(2rem, 6vw, 3rem);
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+    .final .runs {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 1.5rem;
+      color: var(--amber);
+    }
+    .pitchers {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+
+    .box {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.78rem;
+      margin-bottom: 1.25rem;
+      overflow-x: auto;
+      display: block;
+    }
+    .box th, .box td {
+      border-bottom: 1px solid var(--line);
+      padding: 0.45rem 0.35rem;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .box th:first-child, .box td:first-child { text-align: left; }
+    .box th { color: var(--muted); font-weight: 500; }
+
+    .boxes {
+      display: grid;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (min-width: 800px) {
+      .boxes { grid-template-columns: 1fr 1fr; }
+    }
+    .boxcard h3 {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: 1.6rem;
+      letter-spacing: 0.04em;
+      margin: 0 0 0.5rem;
+    }
+    .stat {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.7rem;
+      margin-bottom: 0.75rem;
+    }
+    .stat th, .stat td {
+      border-bottom: 1px solid var(--line);
+      padding: 0.35rem 0.25rem;
+      text-align: right;
+    }
+    .stat th:first-child, .stat td:first-child { text-align: left; }
+    .stat th { color: var(--muted); font-weight: 500; }
+
+    .pbp {
+      max-height: 420px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, 0.25);
+      padding: 0.75rem 1rem;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+      line-height: 1.55;
+      color: #c5d0ca;
+    }
+    .pbp .inning { color: var(--amber); margin-top: 0.65rem; }
+    .pbp .inning:first-child { margin-top: 0; }
+    .pbp .score { color: rgba(232, 228, 217, 0.35); margin-right: 0.5rem; }
+
+    /* —— Retro Gamecast (16 / 64-bit) —— */
+    .cast {
+      display: none;
+      margin-top: 2rem;
+      animation: rise 0.5s ease-out both;
+    }
+    .cast.show { display: block; }
+
+    .cart {
+      position: relative;
+      background: var(--bit-ui);
+      border: 4px solid var(--bit-edge);
+      box-shadow:
+        0 0 0 3px #5a4010,
+        0 12px 0 #0a0c10,
+        0 0 40px rgba(240, 208, 96, 0.12);
+      padding: 0.75rem;
+      image-rendering: pixelated;
+    }
+    .cart::before {
+      content: "";
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.03) 0 1px,
+        transparent 1px 3px
+      );
+      mix-blend-mode: soft-light;
+    }
+    .cast.bit64 .cart {
+      border-width: 2px;
+      border-radius: 10px;
+      box-shadow:
+        0 0 0 1px rgba(240, 208, 96, 0.35),
+        0 18px 40px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      image-rendering: auto;
+    }
+    .cast.bit64 .cart::before { opacity: 0.35; }
+
+    .bit-toggle {
+      display: flex;
+      gap: 0.4rem;
+      justify-content: flex-end;
+      margin-bottom: 0.55rem;
+    }
+    .bit-toggle button {
+      font-family: var(--pix);
+      font-size: 0.65rem;
+      letter-spacing: 0.06em;
+      padding: 0.45rem 0.65rem;
+      background: #0c1218;
+      color: #8a9a92;
+      border: 2px solid #3a4540;
+    }
+    .bit-toggle button.on {
+      color: #1a1205;
+      background: var(--bit-edge);
+      border-color: #fff3b0;
+    }
+
+    .hud {
+      display: grid;
+      gap: 0.55rem;
+      margin-bottom: 0.65rem;
+      background: #080e14;
+      border: 3px solid #4a3a18;
+      padding: 0.55rem 0.65rem;
+    }
+    @media (min-width: 640px) {
+      .hud { grid-template-columns: 1fr auto 1fr; align-items: center; }
+    }
+    .cast.bit64 .hud {
+      border-width: 1px;
+      border-radius: 8px;
+      border-color: rgba(240, 208, 96, 0.35);
+      background: linear-gradient(180deg, #152030, #0a121c);
+    }
+
+    .cast-team {
+      font-family: var(--pix);
+      font-size: 0.62rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #9ab0a4;
+    }
+    .cast-team strong {
+      display: block;
+      font-family: var(--pix);
+      font-size: clamp(1.8rem, 6vw, 2.6rem);
+      color: #fff6c8;
+      line-height: 1;
+      font-weight: 700;
+      text-shadow: 2px 2px 0 #5a4010;
+    }
+    .cast.bit64 .cast-team strong {
+      text-shadow: 0 2px 8px rgba(240, 208, 96, 0.35);
+      font-family: "Bebas Neue", sans-serif;
+      letter-spacing: 0.04em;
+    }
+    .cast-team.home { text-align: right; }
+    .cast-mid {
+      text-align: center;
+      font-family: var(--pix);
+      font-size: 0.7rem;
+      color: var(--bit-edge);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .cast-mid .outs {
+      display: flex;
+      justify-content: center;
+      gap: 0.3rem;
+      margin-top: 0.4rem;
+    }
+    .cast-mid .outs span {
+      width: 0.7rem;
+      height: 0.7rem;
+      border: 2px solid var(--bit-edge);
+      background: transparent;
+      image-rendering: pixelated;
+      box-shadow: 1px 1px 0 #000;
+    }
+    .cast.bit64 .cast-mid .outs span { border-radius: 50%; box-shadow: none; }
+    .cast-mid .outs span.on {
+      background: var(--bit-edge);
+      box-shadow: 0 0 8px rgba(240, 208, 96, 0.55);
+    }
+
+    .field-wrap {
+      position: relative;
+      max-width: 440px;
+      margin: 0 auto 0.75rem;
+      aspect-ratio: 1;
+      border: 3px solid #2a2010;
+      background: #101828;
+      overflow: hidden;
+      box-shadow: inset 0 0 36px rgba(0, 0, 0, 0.45);
+    }
+    .cast.bit64 .field-wrap {
+      border-radius: 8px;
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow:
+        inset 0 0 48px rgba(0, 0, 0, 0.4),
+        0 0 28px rgba(30, 80, 50, 0.2);
+    }
+    .field-bg-16 { display: block; }
+    .field-bg-64 { display: none; }
+    .cast.bit64 .field-bg-16 { display: none; }
+    .cast.bit64 .field-bg-64 { display: block; }
+    .fielder-16 { display: block; opacity: 0.85; }
+    .fielder-64 { display: none; opacity: 0.7; }
+    .cast.bit64 .fielder-16 { display: none; }
+    .cast.bit64 .fielder-64 { display: block; }
+    .runner > rect { display: block; }
+    .runner .r64 { display: none; }
+    .cast.bit64 .runner > rect { display: none; }
+    .cast.bit64 .runner .r64 { display: block; }
+    .cast.bit64 .base.on { filter: url(#baseGlow); }
+    .cast.gc-big .cart {
+      box-shadow:
+        0 0 0 3px #5a4010,
+        0 12px 0 #0a0c10,
+        0 0 64px rgba(255, 224, 102, 0.35);
+    }
+    .cast.bit64.gc-big .cart {
+      box-shadow:
+        0 0 0 1px rgba(255, 230, 140, 0.55),
+        0 22px 56px rgba(0, 0, 0, 0.45),
+        0 0 72px rgba(255, 224, 102, 0.28);
+    }
+    .field {
+      width: 100%;
+      height: 100%;
+      display: block;
+      shape-rendering: crispEdges;
+    }
+    .cast.bit64 .field { shape-rendering: geometricPrecision; }
+
+    .base {
+      fill: #d8d0b8;
+      stroke: #6a6048;
+      stroke-width: 2;
+    }
+    .base.on {
+      fill: #ffe066;
+      stroke: #fff3b0;
+      filter: drop-shadow(0 0 4px rgba(255, 224, 102, 0.8));
+    }
+    .runner { opacity: 0; transition: opacity 0.12s steps(2); }
+    .runner.on { opacity: 1; animation: spriteHop 0.35s steps(2); }
+    .home-plate { fill: #f2eee0; stroke: #8a8470; stroke-width: 2; }
+    .mound { fill: var(--bit-dirt-dk); stroke: var(--bit-dirt); stroke-width: 2; }
+    .wall { fill: var(--bit-wall); }
+    .wall-top { fill: #5a4020; }
+    .infield-dirt { fill: var(--bit-dirt); stroke: var(--bit-dirt-dk); stroke-width: 3; }
+    .foul-line { stroke: #f2eee0; stroke-width: 3; fill: none; stroke-linecap: square; }
+    .cast.bit64 .foul-line { stroke-width: 2; stroke-linecap: round; }
+    .cast.bit64 .infield-dirt {
+      fill: url(#dirt64);
+      stroke: rgba(180, 130, 60, 0.5);
+    }
+
+    .cast-play {
+      min-height: 3.4rem;
+      text-align: center;
+      font-family: var(--pix);
+      font-size: 0.95rem;
+      line-height: 1.35;
+      margin: 0.35rem 0 0.75rem;
+      color: #e8f0ea;
+      text-shadow: 2px 2px 0 #000;
+    }
+    .cast.bit64 .cast-play {
+      font-family: "Source Serif 4", Georgia, serif;
+      text-shadow: none;
+      font-size: 1.1rem;
+    }
+    .cast-play.flash { animation: playIn 0.28s steps(3); }
+    .cast.bit64 .cast-play.flash { animation: playIn 0.35s ease; }
+    .cast-play.big {
+      color: #ffe066;
+      font-size: 1.1rem;
+    }
+    .cast-pitcher {
+      text-align: center;
+      font-family: var(--pix);
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8aa090;
+      margin-bottom: 0.35rem;
+    }
+
+    .cast-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+    }
+    .cast-controls button {
+      font-family: var(--pix);
+      padding: 0.55rem 0.75rem;
+      font-size: 0.65rem;
+      border: 2px solid #4a3a18;
+      background: #1a2218;
+      color: #e8e4d9;
+    }
+    .cast-controls button:hover {
+      border-color: var(--bit-edge);
+      color: var(--bit-edge);
+    }
+    .speed {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--pix);
+      font-size: 0.62rem;
+      color: #8aa090;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .speed input[type="range"] {
+      width: 90px;
+      accent-color: var(--bit-edge);
+    }
+
+    .cast-feed {
+      max-height: 150px;
+      overflow: auto;
+      border: 3px solid #2a2010;
+      background: #060a0e;
+      padding: 0.55rem 0.7rem;
+      font-family: var(--pix);
+      font-size: 0.62rem;
+      line-height: 1.55;
+      color: #7a9084;
+    }
+    .cast.bit64 .cast-feed {
+      border-width: 1px;
+      border-radius: 6px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.68rem;
+    }
+    .cast-feed .row.current { color: #fff6c8; }
+    .cast-feed .row.marker { color: var(--bit-edge); }
+
+    .ball-flash {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      margin: -5px 0 0 -5px;
+      background: #fff;
+      border: 2px solid #f0d060;
+      opacity: 0;
+      z-index: 4;
+      pointer-events: none;
+      image-rendering: pixelated;
+    }
+    .cast.bit64 .ball-flash { border-radius: 50%; }
+    .ball-flash.go {
+      animation: ballFly 0.45s steps(4) forwards;
+    }
+    .cast.bit64 .ball-flash.go {
+      animation: ballFly 0.5s ease-out forwards;
+    }
+
+    .details {
+      display: none;
+      margin-top: 1.75rem;
+      border-top: 1px solid var(--line);
+      padding-top: 1.25rem;
+    }
+    .details.show { display: block; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spriteHop {
+      0% { transform: translateY(3px); }
+      50% { transform: translateY(-3px); }
+      100% { transform: translateY(0); }
+    }
+    @keyframes playIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ballFly {
+      0% { opacity: 1; transform: translate(200px, 300px) scale(1); }
+      60% { opacity: 1; transform: translate(120px, 80px) scale(1.2); }
+      100% { opacity: 0; transform: translate(80px, 40px) scale(0.6); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="brand">HARDBALL</h1>
+    <p class="tag">Local HTML demo · 16-bit / 64-bit Gamecast</p>
+    <p class="lede">
+      Pick two city clubs, then watch a retro diamond Gamecast. Toggle 16-bit (SNES chunky) or 64-bit (smoother HUD).
+      Platoon, pen, park, gloves, and baserunning are live.
+    </p>
+
+    <div class="panel">
+      <div style="margin-bottom: 1rem;">
+        <label for="era">Dynasty era</label>
+        <select id="era"></select>
+        <p class="note" id="eraBlurb" style="margin-top: 0.5rem;"></p>
+      </div>
+      <div class="row two">
+        <div>
+          <label for="away">Away</label>
+          <select id="away"></select>
+        </div>
+        <div>
+          <label for="home">Home</label>
+          <select id="home"></select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="simBtn">Watch game</button>
+        <button type="button" class="ghost" id="swapBtn">Swap sides</button>
+      </div>
+      <p class="note">
+        Open <code>demo/index.html</code> or run <code>npm run demo</code>.
+        Star pool (~75 careers). Not pitch-by-pitch yet — each PA / steal / pitching change animates.
+      </p>
+      <div class="rosters" id="rosters"></div>
+    </div>
+
+    <div class="cast bit64" id="cast">
+      <div class="bit-toggle" role="group" aria-label="Graphics mode">
+        <button type="button" id="bit16Btn" data-mode="bit16">16-bit</button>
+        <button type="button" class="on" id="bit64Btn" data-mode="bit64">64-bit</button>
+      </div>
+      <div class="cart">
+        <div class="hud">
+          <div class="cast-team" id="castAway">
+            <span id="castAwayName">Away</span>
+            <strong id="castAwayRuns">0</strong>
+          </div>
+          <div class="cast-mid">
+            <div id="castInning">Top 1</div>
+            <div class="outs" id="castOuts" aria-label="Outs">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="cast-team home" id="castHome">
+            <span id="castHomeName">Home</span>
+            <strong id="castHomeRuns">0</strong>
+          </div>
+        </div>
+
+        <div class="field-wrap">
+          <div class="ball-flash" id="ballFlash"></div>
+          <svg class="field" viewBox="0 0 400 400" role="img" aria-label="Diamond">
+            <defs>
+              <pattern id="grass16" width="12" height="12" patternUnits="userSpaceOnUse">
+                <rect width="12" height="12" fill="#1a6b38" />
+                <rect width="6" height="6" fill="#145530" />
+                <rect x="6" y="6" width="6" height="6" fill="#145530" />
+                <rect x="2" y="1" width="2" height="2" fill="#248844" />
+                <rect x="8" y="7" width="2" height="2" fill="#2a9050" />
+                <rect x="5" y="9" width="1" height="1" fill="#0e4024" />
+              </pattern>
+              <pattern id="wall16" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="8" fill="#4a3020" />
+                <rect width="8" height="2" fill="#3a2414" />
+                <rect y="4" width="8" height="1" fill="#2a180c" />
+              </pattern>
+              <radialGradient id="sky64" cx="50%" cy="30%" r="75%">
+                <stop offset="0%" stop-color="#1a3048" />
+                <stop offset="55%" stop-color="#0e1a2c" />
+                <stop offset="100%" stop-color="#060c14" />
+              </radialGradient>
+              <linearGradient id="grass64" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#1a6b3a" />
+                <stop offset="45%" stop-color="#145530" />
+                <stop offset="100%" stop-color="#0e4024" />
+              </linearGradient>
+              <pattern id="mow64" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="28" height="28" fill="transparent" />
+                <rect width="14" height="28" fill="rgba(0,0,0,0.12)" />
+              </pattern>
+              <radialGradient id="dirt64" cx="45%" cy="40%" r="65%">
+                <stop offset="0%" stop-color="#e0b868" />
+                <stop offset="55%" stop-color="#c49a4a" />
+                <stop offset="100%" stop-color="#7a5828" />
+              </radialGradient>
+              <linearGradient id="wall64" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#5a4028" />
+                <stop offset="100%" stop-color="#2a1c10" />
+              </linearGradient>
+              <filter id="baseGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="3" result="b" />
+                <feMerge>
+                  <feMergeNode in="b" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            <!-- 16-bit diamond -->
+            <g class="field-bg-16">
+              <rect width="400" height="400" fill="#101828" />
+              <g fill="#1a2840">
+                <rect x="40" y="10" width="2" height="2" opacity="0.5" />
+                <rect x="120" y="18" width="2" height="2" opacity="0.45" />
+                <rect x="210" y="8" width="2" height="2" opacity="0.55" />
+                <rect x="300" y="22" width="2" height="2" opacity="0.4" />
+                <rect x="360" y="14" width="2" height="2" opacity="0.5" />
+              </g>
+              <polygon points="200,10 390,200 200,390 10,200" fill="url(#wall16)" />
+              <polygon points="200,22 378,200 200,378 22,200" fill="url(#grass16)" />
+              <polygon points="200,16 384,200 200,384 16,200" fill="none" stroke="#6a4820" stroke-width="4" />
+              <polygon points="200,36 362,200 200,364 38,200" fill="none" stroke="#c48838" stroke-width="5" />
+              <line class="foul-line" x1="200" y1="328" x2="48" y2="100" />
+              <line class="foul-line" x1="200" y1="328" x2="352" y2="100" />
+              <polygon class="infield-dirt" points="200,108 292,200 200,292 108,200" />
+              <rect x="188" y="160" width="8" height="8" fill="#d4a85a" opacity="0.45" />
+              <rect x="220" y="200" width="8" height="8" fill="#d4a85a" opacity="0.35" />
+              <rect x="172" y="210" width="8" height="8" fill="#a87830" opacity="0.4" />
+              <circle class="mound" cx="200" cy="200" r="16" />
+              <circle cx="200" cy="200" r="5" fill="#f2eee0" />
+            </g>
+
+            <!-- 64-bit diamond -->
+            <g class="field-bg-64">
+              <rect width="400" height="400" fill="url(#sky64)" />
+              <ellipse cx="200" cy="260" rx="180" ry="140" fill="rgba(255,220,120,0.08)" />
+              <polygon points="200,28 372,200 200,372 28,200" fill="url(#grass64)" />
+              <polygon points="200,28 372,200 200,372 28,200" fill="url(#mow64)" />
+              <polygon points="200,40 360,200 200,360 40,200" fill="none" stroke="#b88848" stroke-width="7" opacity="0.7" />
+              <polygon points="200,18 382,200 200,382 18,200" fill="none" stroke="url(#wall64)" stroke-width="11" />
+              <line x1="200" y1="330" x2="52" y2="105" stroke="rgba(245,240,225,0.85)" stroke-width="2.5" stroke-linecap="round" />
+              <line x1="200" y1="330" x2="348" y2="105" stroke="rgba(245,240,225,0.85)" stroke-width="2.5" stroke-linecap="round" />
+              <polygon points="200,105 295,200 200,295 105,200" fill="url(#dirt64)" />
+              <ellipse cx="200" cy="200" rx="88" ry="88" fill="none" stroke="rgba(40,70,40,0.25)" stroke-width="14" />
+              <ellipse cx="200" cy="200" rx="20" ry="14" fill="#8a6a2e" />
+              <ellipse cx="200" cy="198" rx="7" ry="4" fill="#f2eee0" opacity="0.85" />
+            </g>
+
+            <!-- Fielders -->
+            <g class="fielder-16" transform="translate(194,70)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(310,192)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(74,192)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(120,120)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(260,120)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(86,86)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(290,86)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+            <g class="fielder-16" transform="translate(194,48)"><rect x="4" y="0" width="6" height="5" fill="#d8b090"/><rect x="2" y="5" width="10" height="8" fill="#2a5a9a"/><rect x="2" y="13" width="4" height="5" fill="#1a2040"/><rect x="8" y="13" width="4" height="5" fill="#1a2040"/></g>
+
+            <g class="fielder-64" transform="translate(200,78)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(318,200)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(82,200)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(130,130)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(270,130)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(95,95)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(305,95)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+            <g class="fielder-64" transform="translate(200,55)"><ellipse cx="6" cy="16" rx="5" ry="1.8" fill="rgba(0,0,0,0.3)"/><circle cx="6" cy="3.5" r="3.2" fill="#d4b090"/><rect x="2.5" y="6.5" width="7" height="8" rx="1.5" fill="#3a6aaa"/><rect x="2" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/><rect x="6.5" y="14" width="3.5" height="4" rx="0.8" fill="#1a2438"/></g>
+
+            <!-- bases -->
+            <polygon class="base" id="base1" points="318,183 335,200 318,217 301,200" />
+            <polygon class="base" id="base2" points="200,98 217,115 200,132 183,115" />
+            <polygon class="base" id="base3" points="82,183 99,200 82,217 65,200" />
+            <polygon class="home-plate" points="200,336 220,316 220,300 180,300 180,316" />
+
+            <!-- runners: pixel + smooth variants -->
+            <g id="runner1" class="runner" transform="translate(300,188)">
+              <rect x="5" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="3" y="6" width="12" height="11" fill="#e8a838" />
+              <rect x="4" y="8" width="3" height="3" fill="rgba(255,255,255,0.25)" />
+              <rect x="3" y="17" width="5" height="7" fill="#1a2040" />
+              <rect x="10" y="17" width="5" height="7" fill="#1a2040" />
+              <g class="r64">
+                <ellipse cx="9" cy="22" rx="7" ry="2.5" fill="rgba(0,0,0,0.35)" />
+                <circle cx="9" cy="5" r="4.5" fill="#e8c4a0" />
+                <rect x="4" y="9" width="10" height="11" rx="2" fill="#e8a838" />
+                <rect x="3" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+                <rect x="10.5" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+              </g>
+            </g>
+            <g id="runner2" class="runner" transform="translate(188,95)">
+              <rect x="5" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="3" y="6" width="12" height="11" fill="#c43c2a" />
+              <rect x="4" y="8" width="3" height="3" fill="rgba(255,255,255,0.25)" />
+              <rect x="3" y="17" width="5" height="7" fill="#1a2040" />
+              <rect x="10" y="17" width="5" height="7" fill="#1a2040" />
+              <g class="r64">
+                <ellipse cx="9" cy="22" rx="7" ry="2.5" fill="rgba(0,0,0,0.35)" />
+                <circle cx="9" cy="5" r="4.5" fill="#e8c4a0" />
+                <rect x="4" y="9" width="10" height="11" rx="2" fill="#d44a3a" />
+                <rect x="3" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+                <rect x="10.5" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+              </g>
+            </g>
+            <g id="runner3" class="runner" transform="translate(70,188)">
+              <rect x="5" y="0" width="8" height="6" fill="#f0c8a0" />
+              <rect x="3" y="6" width="12" height="11" fill="#2a6ac4" />
+              <rect x="4" y="8" width="3" height="3" fill="rgba(255,255,255,0.25)" />
+              <rect x="3" y="17" width="5" height="7" fill="#1a2040" />
+              <rect x="10" y="17" width="5" height="7" fill="#1a2040" />
+              <g class="r64">
+                <ellipse cx="9" cy="22" rx="7" ry="2.5" fill="rgba(0,0,0,0.35)" />
+                <circle cx="9" cy="5" r="4.5" fill="#e8c4a0" />
+                <rect x="4" y="9" width="10" height="11" rx="2" fill="#3a7ad4" />
+                <rect x="3" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+                <rect x="10.5" y="19" width="4.5" height="6" rx="1" fill="#1a2438" />
+              </g>
+            </g>
+          </svg>
+        </div>
+
+        <div class="cast-pitcher" id="castPitcherMeta">On the mound</div>
+        <div class="cast-play" id="castPlay">Waiting for first pitch…</div>
+
+        <div class="cast-controls">
+          <button type="button" id="castPause">Pause</button>
+          <button type="button" id="castStep">Step</button>
+          <button type="button" id="castSkip">Skip to final</button>
+          <label class="speed">
+            Speed
+            <input type="range" id="castSpeed" min="1" max="5" value="3" />
+          </label>
+        </div>
+        <div class="cast-feed" id="castFeed"></div>
+      </div>
+    </div>
+
+    <div class="details" id="board">
+      <div class="final">
+        <div class="matchup" id="matchup"></div>
+        <div class="runs" id="finalScore"></div>
+      </div>
+      <div class="pitchers" id="pitchers"></div>
+      <table class="box" id="lineScore"></table>
+      <div class="boxes" id="boxes"></div>
+      <div class="pbp" id="pbp"></div>
+    </div>
+  </div>
+
+  <script src="players.embed.js"></script>
+  <script src="sim.bundle.js"></script>
+  <script>
+    const FRANCHISES = [
+      { code: "ARI", city: "Arizona", league: "NL" },
+      { code: "ATL", city: "Atlanta", league: "NL" },
+      { code: "BAL", city: "Baltimore", league: "AL" },
+      { code: "BOS", city: "Boston", league: "AL" },
+      { code: "CHAL", city: "Chicago", league: "AL" },
+      { code: "CHNL", city: "Chicago", league: "NL" },
+      { code: "CIN", city: "Cincinnati", league: "NL" },
+      { code: "CLE", city: "Cleveland", league: "AL" },
+      { code: "COL", city: "Colorado", league: "NL" },
+      { code: "DET", city: "Detroit", league: "AL" },
+      { code: "HOU", city: "Houston", league: "AL" },
+      { code: "KC", city: "Kansas City", league: "AL" },
+      { code: "LAAL", city: "Los Angeles", league: "AL" },
+      { code: "LANL", city: "Los Angeles", league: "NL" },
+      { code: "MIA", city: "Miami", league: "NL" },
+      { code: "MIL", city: "Milwaukee", league: "NL" },
+      { code: "MIN", city: "Minnesota", league: "AL" },
+      { code: "NYAL", city: "New York", league: "AL" },
+      { code: "NYNL", city: "New York", league: "NL" },
+      { code: "OAK", city: "Oakland", league: "AL" },
+      { code: "PHI", city: "Philadelphia", league: "NL" },
+      { code: "PIT", city: "Pittsburgh", league: "NL" },
+      { code: "SD", city: "San Diego", league: "NL" },
+      { code: "SF", city: "San Francisco", league: "NL" },
+      { code: "SEA", city: "Seattle", league: "AL" },
+      { code: "STL", city: "St. Louis", league: "NL" },
+      { code: "TB", city: "Tampa Bay", league: "AL" },
+      { code: "TEX", city: "Texas", league: "AL" },
+      { code: "TOR", city: "Toronto", league: "AL" },
+      { code: "WSH", city: "Washington", league: "NL" },
+    ];
+
+    const POS_ORDER = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
+
+    function hashSeed(str) {
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    }
+
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return () => {
+        t += 0x6d2b79f5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function franchiseByCode(code) {
+      return FRANCHISES.find((f) => f.code === code);
+    }
+
+    function label(f) {
+      return f.city + " " + f.league + " (" + f.code + ")";
+    }
+
+    function fillSelects() {
+      const away = document.getElementById("away");
+      const home = document.getElementById("home");
+      const eraSel = document.getElementById("era");
+      FRANCHISES.forEach((f) => {
+        const o1 = document.createElement("option");
+        o1.value = f.code;
+        o1.textContent = label(f);
+        away.appendChild(o1);
+        const o2 = document.createElement("option");
+        o2.value = f.code;
+        o2.textContent = label(f);
+        home.appendChild(o2);
+      });
+      away.value = "BOS";
+      home.value = "NYAL";
+
+      (HardballSim.DYNASTY_ERAS || []).forEach((e) => {
+        const o = document.createElement("option");
+        o.value = e.id;
+        o.textContent =
+          e.id === "open"
+            ? e.label
+            : e.label + " (" + e.yearFrom + "–" + e.yearTo + ")";
+        eraSel.appendChild(o);
+      });
+      eraSel.value = "modern";
+      eraSel.addEventListener("change", syncEraBlurb);
+      syncEraBlurb();
+    }
+
+    function syncEraBlurb() {
+      const era = HardballSim.dynastyEraById(
+        document.getElementById("era").value,
+      );
+      const pool = eraPool(era);
+      const bats = pool.filter((p) => !p.isPitcher).length;
+      const arms = pool.filter((p) => p.isPitcher).length;
+      document.getElementById("eraBlurb").textContent =
+        era.blurb +
+        " · Demo stars in window: " +
+        bats +
+        " bats / " +
+        arms +
+        " arms (full app has the whole era pool).";
+    }
+
+    function eraPool(era) {
+      return (DEMO_PLAYERS || []).filter((p) =>
+        HardballSim.playerInDynastyEra(p.yearFrom, p.yearTo, era),
+      );
+    }
+
+    function toSimPlayer(raw) {
+      const speed = HardballSim.deriveSpeed(raw);
+      const defense = HardballSim.deriveDefense(raw);
+      return {
+        id: String(raw.fangraphsId),
+        name: raw.name,
+        primaryPos: raw.primaryPos,
+        isPitcher: !!raw.isPitcher,
+        bats: raw.bats || "R",
+        throws: raw.throws || "R",
+        kRate: raw.kRate,
+        bbRate: raw.bbRate,
+        hbpRate: raw.hbpRate,
+        singleRate: raw.singleRate,
+        doubleRate: raw.doubleRate,
+        tripleRate: raw.tripleRate,
+        hrRate: raw.hrRate,
+        stuff: raw.stuff,
+        control: raw.control,
+        durability: raw.durability ?? 50,
+        speed,
+        defense,
+      };
+    }
+
+    function posFit(player, slot) {
+      const p = player.primaryPos;
+      if (slot === "DH") return !player.isPitcher;
+      if (slot === "LF" || slot === "RF") return p === "CF" || p === "LF" || p === "RF" || p === "UTIL";
+      if (slot === "CF") return p === "CF" || p === "UTIL";
+      if (slot === "C") return p === "C" || p === "UTIL";
+      if (slot === p) return true;
+      if (p === "UTIL") return true;
+      return false;
+    }
+
+    /** Split the era-filtered star pool into two clubs with a seeded shuffle. */
+    function dealClubs(seed, era) {
+      const rand = mulberry32(seed);
+      const pool = eraPool(era);
+      const bats = pool.filter((p) => !p.isPitcher).slice();
+      const arms = pool.filter((p) => p.isPitcher).slice();
+      if (bats.length < 18 || arms.length < 12) {
+        throw new Error(
+          "Not enough demo stars in this era — pick All-time or another window (star subset is thin in some eras).",
+        );
+      }
+      // Fisher–Yates
+      for (const arr of [bats, arms]) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(rand() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      }
+      bats.sort((a, b) => b.careerWAR - a.careerWAR);
+      arms.sort((a, b) => b.careerWAR - a.careerWAR);
+
+      const awayBats = [];
+      const homeBats = [];
+      bats.forEach((p, i) => (i % 2 === 0 ? awayBats : homeBats).push(p));
+      const awayArms = [];
+      const homeArms = [];
+      arms.forEach((p, i) => (i % 2 === 0 ? awayArms : homeArms).push(p));
+
+      return {
+        away: buildClub(awayBats, awayArms),
+        home: buildClub(homeBats, homeArms),
+      };
+    }
+
+    function buildClub(batPool, armPool) {
+      const used = new Set();
+      const takeBat = (pred) => {
+        const hit = batPool.find((p) => !used.has(p.fangraphsId) && pred(p));
+        if (!hit) return null;
+        used.add(hit.fangraphsId);
+        return hit;
+      };
+
+      const lineup = [];
+      for (const slot of POS_ORDER) {
+        let p = takeBat((x) => posFit(x, slot));
+        if (!p) p = takeBat(() => true);
+        if (!p) throw new Error("Not enough batters in demo pool");
+        lineup.push({ raw: p, position: slot });
+      }
+
+      const usedArms = new Set();
+      const takeArm = (pred) => {
+        const hit = armPool.find((p) => !usedArms.has(p.fangraphsId) && pred(p));
+        if (!hit) return null;
+        usedArms.add(hit.fangraphsId);
+        return hit;
+      };
+
+      // Closers: lower durability arms first (Rivera / Hoffman style), else top remaining
+      const closers = armPool
+        .filter((p) => (p.durability ?? 99) < 60)
+        .sort((a, b) => b.careerWAR - a.careerWAR);
+      const starterPool = armPool
+        .filter((p) => (p.durability ?? 99) >= 60)
+        .sort((a, b) => b.careerWAR - a.careerWAR);
+
+      const rotation = [];
+      for (let i = 0; i < 5; i++) {
+        const p = takeArm((x) => starterPool.includes(x)) || takeArm(() => true);
+        if (p) rotation.push(p);
+      }
+
+      const bullpen = [];
+      const cl = takeArm((x) => closers.includes(x)) || takeArm(() => true);
+      if (cl) bullpen.push({ raw: cl, role: "CL" });
+      for (const role of ["SU", "SU", "LR", "LR"]) {
+        const p = takeArm(() => true);
+        if (p) bullpen.push({ raw: p, role });
+      }
+
+      const starter = rotation[0];
+      if (!starter) throw new Error("Not enough pitchers in demo pool");
+
+      return { lineup, rotation, bullpen, starter };
+    }
+
+    function clubToSim(club) {
+      const lineupEntries = club.lineup.map((slot, i) => ({
+        player: toSimPlayer(slot.raw),
+        battingOrder: i + 1,
+        position: slot.position,
+      }));
+      const staff = [
+        { player: toSimPlayer(club.starter), role: "SP" },
+        ...club.bullpen.map((a) => ({
+          player: toSimPlayer(a.raw),
+          role: a.role,
+        })),
+      ];
+      return { lineupEntries, staff };
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function showRosters(awayClub, homeClub, awayF, homeF) {
+      const fmt = (club, f) => {
+        const bats = club.lineup
+          .map((s, i) => (i + 1) + ". " + s.raw.name + " (" + s.position + ")")
+          .join("<br>");
+        const staff =
+          "SP " +
+          club.starter.name +
+          "<br>Pen: " +
+          club.bullpen.map((a) => a.raw.name + " " + a.role).join(", ");
+        return (
+          "<div><strong>" +
+          f.city +
+          " " +
+          f.league +
+          "</strong><br>" +
+          bats +
+          "<br>" +
+          staff +
+          "</div>"
+        );
+      };
+      const el = document.getElementById("rosters");
+      el.innerHTML = fmt(awayClub, awayF) + fmt(homeClub, homeF);
+      el.classList.add("show");
+    }
+
+    function halfLines(innings) {
+      const away = [];
+      const home = [];
+      for (let i = 0; i < innings.length; i++) {
+        if (i % 2 === 0) away.push(innings[i]);
+        else home.push(innings[i]);
+      }
+      return { away, home };
+    }
+
+    function renderLineScore(awayF, homeF, result) {
+      const lines = halfLines(result.innings);
+      const n = Math.max(lines.away.length, lines.home.length, 9);
+      let head = "<tr><th></th>";
+      for (let i = 1; i <= n; i++) head += "<th>" + i + "</th>";
+      head += "<th>R</th></tr>";
+
+      const awayHits = (result.awayBox.batters || []).reduce((s, b) => s + b.h, 0);
+      const homeHits = (result.homeBox.batters || []).reduce((s, b) => s + b.h, 0);
+
+      const row = (code, line, runs) => {
+        let cells = "<tr><td>" + code + "</td>";
+        for (let i = 0; i < n; i++) {
+          const v = line[i];
+          cells += "<td>" + (v === undefined ? "" : v) + "</td>";
+        }
+        cells += "<td>" + runs + "</td></tr>";
+        return cells;
+      };
+
+      document.getElementById("lineScore").innerHTML =
+        head +
+        row(awayF.code, lines.away, result.awayScore) +
+        row(homeF.code, lines.home, result.homeScore);
+
+      // stash hits for pitchers line
+      document.getElementById("pitchers").textContent =
+        result.awayPitcher +
+        " vs " +
+        result.homePitcher +
+        " · H " +
+        awayHits +
+        "-" +
+        homeHits;
+    }
+
+    function renderBoxes(awayF, homeF, result) {
+      const fmtIp = HardballSim.formatIp;
+      const side = (title, box) => {
+        const bats = (box.batters || [])
+          .map(
+            (b) =>
+              "<tr><td>" +
+              escapeHtml(b.name) +
+              "</td><td>" +
+              b.ab +
+              "</td><td>" +
+              b.r +
+              "</td><td>" +
+              b.h +
+              "</td><td>" +
+              b.rbi +
+              "</td><td>" +
+              b.bb +
+              "</td><td>" +
+              b.so +
+              "</td><td>" +
+              b.hr +
+              "</td><td>" +
+              (b.sb || 0) +
+              "</td></tr>",
+          )
+          .join("");
+        const arms = (box.pitchers || [])
+          .map(
+            (p) =>
+              "<tr><td>" +
+              escapeHtml(p.name) +
+              (p.decision ? " (" + p.decision + ")" : "") +
+              "</td><td>" +
+              fmtIp(p.ip) +
+              "</td><td>" +
+              p.h +
+              "</td><td>" +
+              p.r +
+              "</td><td>" +
+              p.er +
+              "</td><td>" +
+              p.bb +
+              "</td><td>" +
+              p.so +
+              "</td></tr>",
+          )
+          .join("");
+        return (
+          '<div class="boxcard"><h3>' +
+          escapeHtml(title) +
+          "</h3>" +
+          '<table class="stat"><thead><tr><th>Batter</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>SO</th><th>HR</th><th>SB</th></tr></thead><tbody>' +
+          bats +
+          "</tbody></table>" +
+          '<table class="stat"><thead><tr><th>Pitcher</th><th>IP</th><th>H</th><th>R</th><th>ER</th><th>BB</th><th>SO</th></tr></thead><tbody>' +
+          arms +
+          "</tbody></table></div>"
+        );
+      };
+      document.getElementById("boxes").innerHTML =
+        side(awayF.city + " " + awayF.league, result.awayBox) +
+        side(homeF.city + " " + homeF.league, result.homeBox);
+    }
+
+    function renderPbp(plays) {
+      document.getElementById("pbp").innerHTML = (plays || [])
+        .map((p) => {
+          const inn = p.text && p.text.startsWith("===");
+          if (inn) {
+            return '<div class="inning">' + escapeHtml(p.text) + "</div>";
+          }
+          return (
+            "<div><span class=\"score\">" +
+            p.awayScore +
+            "-" +
+            p.homeScore +
+            "</span>" +
+            escapeHtml(p.text) +
+            "</div>"
+          );
+        })
+        .join("");
+    }
+
+    const cast = {
+      plays: [],
+      idx: -1,
+      timer: null,
+      playing: false,
+      awayF: null,
+      homeF: null,
+      result: null,
+    };
+
+    function speedMs() {
+      const v = Number(document.getElementById("castSpeed").value) || 3;
+      // 1 slow → 5 fast
+      return [1400, 1000, 700, 420, 220][v - 1];
+    }
+
+    function isBigPlay(text) {
+      return /homers|forcing in a run|run scores|runs score|steals|caught stealing|enters from the pen|double play/i.test(
+        text,
+      );
+    }
+
+    function setBases(bases) {
+      const b = bases || [false, false, false];
+      document.getElementById("base1").classList.toggle("on", !!b[0]);
+      document.getElementById("base2").classList.toggle("on", !!b[1]);
+      document.getElementById("base3").classList.toggle("on", !!b[2]);
+      document.getElementById("runner1").classList.toggle("on", !!b[0]);
+      document.getElementById("runner2").classList.toggle("on", !!b[1]);
+      document.getElementById("runner3").classList.toggle("on", !!b[2]);
+    }
+
+    function flashBall(text) {
+      if (!/singles|doubles|triples|homers|flies|lines|grounds/.test(text || "")) {
+        return;
+      }
+      const el = document.getElementById("ballFlash");
+      el.classList.remove("go");
+      void el.offsetWidth;
+      el.classList.add("go");
+    }
+
+    function setBitMode(mode) {
+      const castEl = document.getElementById("cast");
+      castEl.classList.remove("bit16", "bit64");
+      castEl.classList.add(mode);
+      document.getElementById("bit16Btn").classList.toggle("on", mode === "bit16");
+      document.getElementById("bit64Btn").classList.toggle("on", mode === "bit64");
+      try {
+        localStorage.setItem("hardball-bit", mode);
+      } catch (_) {}
+    }
+
+    function setOuts(n) {
+      const dots = document.querySelectorAll("#castOuts span");
+      dots.forEach((el, i) => el.classList.toggle("on", i < n));
+    }
+
+    function renderCastFrame(play) {
+      document.getElementById("castAwayRuns").textContent = play.awayScore;
+      document.getElementById("castHomeRuns").textContent = play.homeScore;
+      const halfLabel = play.half === "top" ? "Top" : "Bot";
+      document.getElementById("castInning").textContent =
+        halfLabel + " " + play.inning;
+      setOuts(play.outs || 0);
+      setBases(play.bases);
+      document.getElementById("castPitcherMeta").textContent = play.pitcher
+        ? "Pitching · " + play.pitcher
+        : "";
+
+      const playEl = document.getElementById("castPlay");
+      const castRoot = document.getElementById("cast");
+      playEl.classList.remove("flash", "big");
+      void playEl.offsetWidth;
+      playEl.textContent = play.text.replace(/^=== | ===$/g, "").replace(/^=== /, "");
+      playEl.classList.add("flash");
+      const big = isBigPlay(play.text) || play.text.startsWith("===");
+      playEl.classList.toggle("big", big);
+      castRoot.classList.toggle("gc-big", big);
+      flashBall(play.text);
+
+      const feed = document.getElementById("castFeed");
+      const rows = cast.plays.slice(0, cast.idx + 1).slice(-12);
+      feed.innerHTML = rows
+        .map((p, i) => {
+          const last = i === rows.length - 1;
+          const marker = p.text.startsWith("===");
+          return (
+            '<div class="row' +
+            (last ? " current" : "") +
+            (marker ? " marker" : "") +
+            '">' +
+            escapeHtml(p.text) +
+            "</div>"
+          );
+        })
+        .join("");
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    function stopCast() {
+      cast.playing = false;
+      if (cast.timer) {
+        clearTimeout(cast.timer);
+        cast.timer = null;
+      }
+      document.getElementById("castPause").textContent = "Play";
+    }
+
+    function finishCast() {
+      stopCast();
+      if (!cast.result) return;
+      document.getElementById("matchup").textContent =
+        cast.awayF.city +
+        " " +
+        cast.awayF.league +
+        " @ " +
+        cast.homeF.city +
+        " " +
+        cast.homeF.league;
+      document.getElementById("finalScore").textContent =
+        cast.result.awayScore + " – " + cast.result.homeScore;
+      renderLineScore(cast.awayF, cast.homeF, cast.result);
+      renderBoxes(cast.awayF, cast.homeF, cast.result);
+      renderPbp(cast.result.playByPlay);
+      document.getElementById("board").classList.add("show");
+      document.getElementById("castPlay").textContent =
+        "Final · " +
+        cast.result.awayScore +
+        " – " +
+        cast.result.homeScore;
+      document.getElementById("castPlay").classList.add("big");
+    }
+
+    function stepCast() {
+      if (cast.idx >= cast.plays.length - 1) {
+        finishCast();
+        return false;
+      }
+      cast.idx += 1;
+      renderCastFrame(cast.plays[cast.idx]);
+      if (cast.idx >= cast.plays.length - 1) {
+        finishCast();
+        return false;
+      }
+      return true;
+    }
+
+    function scheduleCast() {
+      if (!cast.playing) return;
+      cast.timer = setTimeout(() => {
+        if (!stepCast()) return;
+        scheduleCast();
+      }, speedMs());
+    }
+
+    function startCast(plays, awayF, homeF, result) {
+      stopCast();
+      cast.plays = plays || [];
+      cast.idx = -1;
+      cast.awayF = awayF;
+      cast.homeF = homeF;
+      cast.result = result;
+      document.getElementById("castAwayName").textContent =
+        awayF.city + " " + awayF.league;
+      document.getElementById("castHomeName").textContent =
+        homeF.city + " " + homeF.league;
+      document.getElementById("castAwayRuns").textContent = "0";
+      document.getElementById("castHomeRuns").textContent = "0";
+      document.getElementById("castInning").textContent = "Top 1";
+      document.getElementById("castPlay").textContent = "Play ball…";
+      document.getElementById("castPlay").classList.remove("big");
+      document.getElementById("castFeed").innerHTML = "";
+      document.getElementById("board").classList.remove("show");
+      setOuts(0);
+      setBases([false, false, false]);
+      document.getElementById("cast").classList.add("show");
+      document.getElementById("cast").scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      cast.playing = true;
+      document.getElementById("castPause").textContent = "Pause";
+      scheduleCast();
+    }
+
+    function simGame() {
+      if (!window.HardballSim || !window.DEMO_PLAYERS) {
+        alert(
+          "Sim files failed to load. Keep index.html, players.embed.js, and sim.bundle.js in the same folder.",
+        );
+        return;
+      }
+      const awayCode = document.getElementById("away").value;
+      const homeCode = document.getElementById("home").value;
+      if (awayCode === homeCode) {
+        alert("Pick two different clubs.");
+        return;
+      }
+
+      const awayF = franchiseByCode(awayCode);
+      const homeF = franchiseByCode(homeCode);
+      const era = HardballSim.dynastyEraById(
+        document.getElementById("era").value,
+      );
+      const seed = (Date.now() ^ hashSeed(awayCode + homeCode)) >>> 0;
+      let dealt;
+      try {
+        dealt = dealClubs(
+          hashSeed(awayCode + "|" + homeCode + "|" + era.id + "|" + (seed % 97)),
+          era,
+        );
+      } catch (err) {
+        alert(err.message || String(err));
+        return;
+      }
+      showRosters(dealt.away, dealt.home, awayF, homeF);
+
+      const away = clubToSim(dealt.away);
+      const home = clubToSim(dealt.home);
+
+      const result = HardballSim.simulateGame({
+        awayLineup: away.lineupEntries,
+        homeLineup: home.lineupEntries,
+        awayStaff: away.staff,
+        homeStaff: home.staff,
+        park: HardballSim.parkForCode(homeCode),
+        era: HardballSim.eraById(era.climateId),
+        seed,
+      });
+
+      startCast(result.playByPlay, awayF, homeF, result);
+    }
+
+    document.getElementById("simBtn").addEventListener("click", simGame);
+    document.getElementById("swapBtn").addEventListener("click", () => {
+      const a = document.getElementById("away");
+      const h = document.getElementById("home");
+      const tmp = a.value;
+      a.value = h.value;
+      h.value = tmp;
+    });
+    document.getElementById("castPause").addEventListener("click", () => {
+      if (cast.playing) {
+        stopCast();
+      } else if (cast.idx < cast.plays.length - 1) {
+        cast.playing = true;
+        document.getElementById("castPause").textContent = "Pause";
+        scheduleCast();
+      }
+    });
+    document.getElementById("castStep").addEventListener("click", () => {
+      stopCast();
+      stepCast();
+    });
+    document.getElementById("castSkip").addEventListener("click", () => {
+      cast.idx = cast.plays.length - 1;
+      if (cast.plays.length) renderCastFrame(cast.plays[cast.idx]);
+      finishCast();
+    });
+    document.getElementById("bit16Btn").addEventListener("click", () => setBitMode("bit16"));
+    document.getElementById("bit64Btn").addEventListener("click", () => setBitMode("bit64"));
+
+    fillSelects();
+    try {
+      const saved = localStorage.getItem("hardball-bit");
+      if (saved === "bit16" || saved === "bit64") setBitMode(saved);
+    } catch (_) {}
+  </script>
+</body>
+</html>

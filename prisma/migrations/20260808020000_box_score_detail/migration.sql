@@ -1,0 +1,10 @@
+-- AlterTable: richer batting box
+ALTER TABLE "SeasonBattingStat" ADD COLUMN "doubles" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SeasonBattingStat" ADD COLUMN "triples" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SeasonBattingStat" ADD COLUMN "hbp" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SeasonBattingStat" ADD COLUMN "sf" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable: richer pitching box
+ALTER TABLE "SeasonPitchingStat" ADD COLUMN "qs" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SeasonPitchingStat" ADD COLUMN "cg" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "SeasonPitchingStat" ADD COLUMN "sho" INTEGER NOT NULL DEFAULT 0;
