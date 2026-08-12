@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
 import { makePrismaClient, targetLabel } from "../scripts/prisma-client";
+import { salaryFromValue } from "../scripts/recompute-salaries";
 
 const prisma = makePrismaClient();
 console.log(`Seeding → ${targetLabel}`);
@@ -29,9 +30,22 @@ type CareerPlayer = {
   control: number;
   durability: number;
   careerWAR?: number;
+  careerPA?: number;
+  careerIP?: number;
   goldGloves?: number;
   description: string;
 };
+
+function playingTime(p: CareerPlayer): number {
+  if (p.isPitcher) {
+    if (p.careerIP != null) return p.careerIP;
+    const m = p.description?.match(/([\d.]+)\s*IP/);
+    return m ? Number(m[1]) : 0;
+  }
+  if (p.careerPA != null) return p.careerPA;
+  const m = p.description?.match(/(\d+)\s*PA/);
+  return m ? Number(m[1]) : 0;
+}
 
 async function seedPlayers() {
   const jsonPath = path.join(process.cwd(), "data", "career_players.json");
@@ -43,6 +57,12 @@ async function seedPlayers() {
 
   const players = JSON.parse(fs.readFileSync(jsonPath, "utf8")) as CareerPlayer[];
   console.log(`Loading ${players.length} career players…`);
+
+  // Always recompute salary from WAR + playing time so tiny samples can't
+  // ship at Andruw Jones money if the JSON was built with an older formula.
+  for (const p of players) {
+    p.salary = salaryFromValue(p.careerWAR ?? 0, playingTime(p), p.isPitcher);
+  }
 
   // Replace pool (leagues referencing old players must be cleared by reseed script)
   await prisma.player.deleteMany();
