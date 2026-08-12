@@ -182,7 +182,7 @@ export function DraftBoard({
                 disabled={pending}
                 onClick={() => act(() => autoDraftMyTeamAction(leagueId))}
               >
-                Auto-draft my team
+                Auto-build my roster
               </button>
             ) : null}
           </div>
@@ -213,7 +213,7 @@ export function DraftBoard({
             Waiting on {clock.onClockName ?? clock.onClockAbbr}
             {clock.order.find((o) => o.abbr === clock.onClockAbbr)?.isCpu
               ? " — CPU is picking…"
-              : ". You can still hit Auto-draft — it runs when you’re up."}
+              : ". You can still hit Auto-build — it runs when you’re up."}
           </p>
         ) : null}
       </div>
