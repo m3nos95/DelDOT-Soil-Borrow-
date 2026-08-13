@@ -35,9 +35,12 @@ export function DashboardClient() {
   const [recent, setRecent] = useState<Summary[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nofoName, setNofoName] = useState("Safe Streets and Roads for All (SS4A) FY2024.pdf");
-  const [projectName, setProjectName] = useState("Unfunded Projects - Jul 2024.xlsx");
+  const [nofoFile, setNofoFile] = useState<File | null>(null);
+  const [projectFile, setProjectFile] = useState<File | null>(null);
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+
+  const nofoName = nofoFile?.name ?? "Safe Streets and Roads for All (SS4A) FY2024.pdf";
+  const projectName = projectFile?.name ?? "Unfunded Projects - Jul 2024.xlsx";
 
   async function refreshRecent() {
     const res = await fetch("/api/analyses");
@@ -55,19 +58,24 @@ export function DashboardClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function analyze(demo = true) {
+  async function analyze() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          demo,
-          nofoFileName: nofoName,
-          projectFileName: projectName,
-        }),
-      });
+      let res: Response;
+      if (nofoFile || projectFile) {
+        const form = new FormData();
+        if (nofoFile) form.set("nofo", nofoFile);
+        else form.set("sampleNofo", "ss4a");
+        if (projectFile) form.set("projects", projectFile);
+        res = await fetch("/api/analyze", { method: "POST", body: form });
+      } else {
+        res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ demo: true }),
+        });
+      }
       const data = (await res.json()) as { analysis?: Analysis; error?: string };
       if (!res.ok || !data.analysis) throw new Error(data.error ?? "Analysis failed");
       setAnalysis(data.analysis);
@@ -98,20 +106,22 @@ export function DashboardClient() {
                 icon={<FileText className="h-8 w-8 text-red-600" />}
                 label="NOFO Document (PDF)"
                 fileName={nofoName}
-                size="2.4 MB"
-                onChange={() => setNofoName("Safe Streets and Roads for All (SS4A) FY2024.pdf")}
+                sizeLabel={nofoFile ? formatBytes(nofoFile.size) : "Sample · 2.4 MB"}
+                accept=".pdf,.txt"
+                onFile={setNofoFile}
               />
               <UploadCard
                 icon={<FileSpreadsheet className="h-8 w-8 text-emerald-700" />}
                 label="Project List (Excel/CSV)"
                 fileName={projectName}
-                size="1.1 MB"
-                onChange={() => setProjectName("Unfunded Projects - Jul 2024.xlsx")}
+                sizeLabel={projectFile ? formatBytes(projectFile.size) : "Sample · 1.1 MB"}
+                accept=".xlsx,.xls,.csv"
+                onFile={setProjectFile}
               />
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
-                onClick={() => void analyze(true)}
+                onClick={() => void analyze()}
                 disabled={busy}
                 className="inline-flex items-center gap-2 rounded-lg bg-deldot-blue px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-navy-700 disabled:opacity-60"
               >
@@ -122,6 +132,8 @@ export function DashboardClient() {
                 onClick={() => {
                   setAnalysis(null);
                   setError(null);
+                  setNofoFile(null);
+                  setProjectFile(null);
                 }}
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-navy-800 hover:bg-slate-50"
               >
@@ -298,33 +310,48 @@ export function DashboardClient() {
   );
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function UploadCard({
   icon,
   label,
   fileName,
-  size,
-  onChange,
+  sizeLabel,
+  accept,
+  onFile,
 }: {
   icon: React.ReactNode;
   label: string;
   fileName: string;
-  size: string;
-  onChange: () => void;
+  sizeLabel: string;
+  accept: string;
+  onFile: (file: File) => void;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <label className="block cursor-pointer rounded-lg border border-slate-200 bg-slate-50 p-4 hover:border-deldot-blue">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-3 flex items-center gap-3">
         {icon}
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{fileName}</div>
-          <div className="text-xs text-slate-500">{size} · Ready</div>
+          <div className="text-xs text-slate-500">{sizeLabel} · Ready</div>
         </div>
       </div>
-      <button onClick={onChange} className="mt-3 text-sm font-medium text-deldot-blue hover:underline">
-        Change File
-      </button>
-    </div>
+      <div className="mt-3 text-sm font-medium text-deldot-blue">Change File</div>
+      <input
+        type="file"
+        accept={accept}
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(file);
+        }}
+      />
+    </label>
   );
 }
 
