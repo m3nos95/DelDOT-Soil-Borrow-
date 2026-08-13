@@ -87,8 +87,13 @@ export function DashboardClient() {
     }
   }
 
-  const top = useMemo(() => analysis?.matches.slice(0, 5) ?? [], [analysis]);
+  const recommended = useMemo(
+    () => analysis?.matches.filter((m) => m.recommended) ?? [],
+    [analysis],
+  );
+  const top = recommended.slice(0, 5);
   const step = analysis ? 3 : 1;
+  const noStrong = Boolean(analysis && recommended.length === 0);
 
   return (
     <div>
@@ -155,6 +160,12 @@ export function DashboardClient() {
                 </Link>
               )}
             </div>
+            {noStrong && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-navy-900">
+                <strong>No strong matches.</strong> {analysis?.insight} Weak alignments are not shown here so a
+                ranking is not forced. Open full review only if you want to inspect low-scoring projects.
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
@@ -167,10 +178,17 @@ export function DashboardClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {top.length === 0 && (
+                  {!analysis && (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-slate-500">
                         Upload a NOFO and click Analyze Projects to rank Unifier unfunded projects.
+                      </td>
+                    </tr>
+                  )}
+                  {noStrong && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-500">
+                        No projects met the eligibility bar for this NOFO.
                       </td>
                     </tr>
                   )}

@@ -111,4 +111,14 @@ describe("matching engine", () => {
     expect(interchange).toBeTruthy();
     expect(transit!.score).toBeGreaterThan(interchange!.score);
   });
+
+  it("does not force highway projects as FTA bus recommendations", () => {
+    const matches = matchProjects(getUnfundedProjects(), extractNofoCriteria(SAMPLE_BUS_NOFO, "bus.pdf"));
+    const downtown = matches.find((m) => m.projectName === "Georgetown Downtown Multimodal Safety Project");
+    expect(downtown?.score).toBeLessThanOrEqual(45);
+    expect(downtown?.recommended).toBe(false);
+    for (const m of matches.filter((row) => row.recommended)) {
+      expect(m.projectName).toMatch(/transit|dart|bus|charging|signal/i);
+    }
+  });
 });

@@ -16,7 +16,7 @@ export async function runAnalysis(input: {
   const priorFeedback = prior.flatMap((a) => a.feedback);
   const matches = matchProjects(projects, criteria, priorFeedback);
   const now = new Date().toISOString();
-  const strongMatchCount = matches.filter((m) => m.score >= 70).length;
+  const strongMatchCount = matches.filter((m) => m.recommended).length;
   const analysis: Analysis = {
     id: slugId("an"),
     createdAt: now,

@@ -273,6 +273,7 @@ export function scoreProject(
 ): Omit<MatchResult, "rank" | "recommended"> {
   const tokens = projectTokens(project);
   const boost = feedbackBoostFor(project, priorFeedback);
+  const fit = typeFit(project, criteria);
   const breakdown: ScoreBreakdown = {
     eligibility: eligibilityScore(project, criteria, tokens),
     evaluation: evaluationScore(project, criteria, tokens),
@@ -280,13 +281,15 @@ export function scoreProject(
     fundingObjectives: fundingScore(project, criteria, tokens),
     historic: historicScore(project, criteria, boost),
   };
-  const score = clamp(
+  let score =
     breakdown.eligibility * WEIGHTS.eligibility +
-      breakdown.evaluation * WEIGHTS.evaluation +
-      breakdown.priorities * WEIGHTS.priorities +
-      breakdown.fundingObjectives * WEIGHTS.fundingObjectives +
-      breakdown.historic * WEIGHTS.historic,
-  );
+    breakdown.evaluation * WEIGHTS.evaluation +
+    breakdown.priorities * WEIGHTS.priorities +
+    breakdown.fundingObjectives * WEIGHTS.fundingObjectives +
+    breakdown.historic * WEIGHTS.historic;
+  if (fit < 0.4) score = Math.min(score, 45);
+  else if (fit < 0.7) score = Math.min(score, 62);
+  score = clamp(score);
   const { why, strengths, gaps } = explain(project, criteria, breakdown);
   return {
     projectId: project.id,
@@ -310,19 +313,27 @@ export function matchProjects(
   criteria: NofoCriteria,
   priorFeedback: Feedback[] = [],
 ): MatchResult[] {
+  const byId = new Map(projects.map((p) => [p.id, p]));
   const scored = projects
     .map((p) => scoreProject(p, criteria, priorFeedback))
     .sort((a, b) => b.score - a.score)
-    .map((m, i) => ({
-      ...m,
-      rank: i + 1,
-      recommended: m.score >= 70 && i < 12,
-    }));
+    .map((m, i) => {
+      const project = byId.get(m.projectId);
+      const fit = project ? typeFit(project, criteria) : 0;
+      return {
+        ...m,
+        rank: i + 1,
+        recommended: m.score >= 70 && fit >= 0.7 && i < 12,
+      };
+    });
   return scored;
 }
 
 export function buildInsight(matches: MatchResult[], criteria: NofoCriteria, projectCount: number): string {
-  const strong = matches.filter((m) => m.score >= 70).length;
+  const strong = matches.filter((m) => m.recommended).length;
+  if (!strong) {
+    return `No Unifier projects are a strong fit for ${criteria.programName}. The agent will not force a recommendation — the Grant Manager can stop here or review weak alignments only.`;
+  }
   const pct = projectCount ? Math.round((strong / projectCount) * 100) : 0;
   return `Based on the ${criteria.programName} criteria and Unifier project data, ${strong} projects (${pct}%) show strong potential.`;
 }
