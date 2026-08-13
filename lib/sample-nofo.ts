@@ -156,3 +156,40 @@ planning.
 5. FUNDING OBJECTIVES
 Construction of resilience improvements and planning for resilience.
 `;
+
+export const SAMPLE_BUS_NOFO = `U.S. Department of Transportation
+Federal Transit Administration
+
+Notice of Funding Opportunity
+FY 2026 Competitive Funding Opportunity: Grants for Buses and Bus
+Facilities Infrastructure Programs and Low or No Emission Grant Program
+
+Funding opportunity IDs: FTA-2026-010-TPM-BUS and FTA-2026-011-TPM-LWNO
+Authority: 49 U.S.C. 5339(b) and (c)
+
+1. PROGRAM OVERVIEW
+FTA announces competitive grants for the Grants for Buses and Bus Facilities Program
+and the Low or No Emission Grant Program. Eligible projects purchase, replace, or
+rehabilitate buses and related equipment and construct or rehabilitate bus facilities,
+including low- or no-emission vehicles and charging or fueling infrastructure.
+
+2. ELIGIBILITY
+Designated recipients, states, and eligible transit agencies. Projects must be transit bus
+fleet, bus facilities, or low/no emission bus and related infrastructure.
+
+3. EVALUATION CRITERIA
+- Demonstration of need
+- Demonstration of benefits, including safety and emissions reduction
+- Project implementation strategy and readiness
+- Local financial commitment
+
+4. PROGRAM PRIORITIES
+- Zero-emission and low-emission transit buses
+- Bus facilities in a state of good repair
+- Workforce development for zero-emission fleets
+- Improved transit service reliability
+
+5. FUNDING OBJECTIVES
+Purchase or lease of buses and related equipment; construction of bus facilities;
+deployment of low or no emission vehicles and charging.
+`;

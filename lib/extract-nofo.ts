@@ -1,6 +1,7 @@
 import type { NofoCriteria } from "./types";
 import {
   SAMPLE_BRIDGE_NOFO,
+  SAMPLE_BUS_NOFO,
   SAMPLE_PROTECT_NOFO,
   SAMPLE_RAISE_NOFO,
   SAMPLE_SS4A_NOFO,
@@ -215,7 +216,14 @@ export const PROGRAM_CATALOG: ProgramCatalog[] = [
   },
   {
     code: "INFRA",
-    names: ["infra", "infrastructure for rebuilding america", "nationally significant"],
+    names: [
+      "infra grants",
+      "infra program",
+      "infra (nationally",
+      "nationally significant multimodal",
+      "nationally significant freight",
+      "nsmfhp",
+    ],
     criteria: {
       programName: "INFRA (Nationally Significant Multimodal Freight & Highway Projects)",
       programCode: "INFRA",
@@ -254,6 +262,72 @@ export const PROGRAM_CATALOG: ProgramCatalog[] = [
       awardRange: { min: 500_000, max: 15_000_000 },
     },
   },
+  {
+    code: "BUS",
+    names: [
+      "grants for buses and bus facilities",
+      "bus facilities infrastructure",
+      "low or no emission",
+      "low-no",
+      "low no emission",
+      "fta-2026-010",
+      "fta-2026-011",
+      "5339(b)",
+      "5339(c)",
+      "buses and bus facilities",
+    ],
+    criteria: {
+      programName: "FTA Grants for Buses and Bus Facilities / Low or No Emission (FY2026)",
+      programCode: "BUS",
+      agency: "U.S. DOT / FTA",
+      fiscalYear: "FY2026",
+      summary:
+        "Competitive FTA grants for buses, bus facilities, and low- or no-emission transit vehicles and related charging or fueling.",
+      eligibility: [
+        "Designated FTA recipients, states, and eligible transit agencies",
+        "Projects to replace, rehabilitate, purchase, or lease buses or related equipment",
+        "Bus facilities, including maintenance, administrative, and passenger facilities",
+        "Low or no emission buses and related charging, fueling, and facility work",
+      ],
+      evaluationCriteria: [
+        "Demonstration of need",
+        "Demonstration of benefits, including safety and emissions reduction",
+        "Project implementation strategy and readiness",
+        "Local financial commitment",
+      ],
+      programPriorities: [
+        "Zero-emission and low-emission transit buses",
+        "Bus facilities in a state of good repair",
+        "Workforce development for zero-emission fleets",
+        "Improved transit service reliability",
+      ],
+      fundingObjectives: [
+        "Purchase or lease of buses and related equipment",
+        "Construction or rehabilitation of bus facilities",
+        "Low or no emission vehicle and infrastructure deployment",
+      ],
+      eligibleProjectTypes: [
+        "transit buses",
+        "bus facilities",
+        "bus maintenance facilities",
+        "low-no emission buses",
+        "transit charging",
+        "transit signal priority",
+      ],
+      keywords: [
+        "transit",
+        "bus",
+        "dart",
+        "low-no",
+        "zero-emission",
+        "charging",
+        "fleet",
+        "facility",
+        "5339",
+      ],
+      awardRange: { min: 500_000, max: 50_000_000 },
+    },
+  },
 ];
 
 const SECTION_PATTERNS: Array<{ key: keyof Pick<NofoCriteria, "eligibility" | "evaluationCriteria" | "programPriorities" | "fundingObjectives">; labels: RegExp }> = [
@@ -265,12 +339,25 @@ const SECTION_PATTERNS: Array<{ key: keyof Pick<NofoCriteria, "eligibility" | "e
 
 export function detectProgram(text: string): ProgramCatalog | undefined {
   const hay = text.toLowerCase();
-  let best: { program: ProgramCatalog; hits: number } | undefined;
+  let best: { program: ProgramCatalog; score: number } | undefined;
   for (const program of PROGRAM_CATALOG) {
-    const hits = program.names.filter((n) => hay.includes(n)).length;
-    if (hits > 0 && (!best || hits > best.hits)) best = { program, hits };
+    let score = 0;
+    for (const name of program.names) {
+      score += phraseScore(hay, name);
+    }
+    if (score > 0 && (!best || score > best.score)) best = { program, score };
   }
   return best?.program;
+}
+
+function phraseScore(hay: string, name: string): number {
+  const needle = name.toLowerCase();
+  if (!needle) return 0;
+  if (needle.includes(" ") || needle.includes("-") || needle.includes("(")) {
+    return hay.includes(needle) ? needle.length : 0;
+  }
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`).test(hay) ? needle.length : 0;
 }
 
 function bulletsFrom(block: string): string[] {
@@ -375,6 +462,8 @@ function harvestKeywords(text: string): string[] {
     "signal",
     "climate",
     "multimodal",
+    "bus",
+    "fleet",
   ];
   const hay = text.toLowerCase();
   return vocab.filter((k) => hay.includes(k));
@@ -386,5 +475,6 @@ export function sampleNofoTextForFile(fileName: string): string | undefined {
   if (n.includes("raise")) return SAMPLE_RAISE_NOFO;
   if (n.includes("bridge") || n.includes("bip")) return SAMPLE_BRIDGE_NOFO;
   if (n.includes("protect")) return SAMPLE_PROTECT_NOFO;
+  if (n.includes("bus") || n.includes("low-no") || n.includes("low no")) return SAMPLE_BUS_NOFO;
   return undefined;
 }

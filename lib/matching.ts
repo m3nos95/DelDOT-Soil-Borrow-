@@ -17,6 +17,7 @@ const CATEGORY_PROGRAM: Record<string, string[]> = {
   PROTECT: ["resilience"],
   INFRA: ["freight", "safety"],
   CFI: ["ev-charging"],
+  BUS: ["transit", "ev-charging", "signals"],
   CUSTOM: [],
 };
 
@@ -118,6 +119,12 @@ function evaluationScore(project: Project, criteria: NofoCriteria, tokens: Set<s
   if (criteria.programCode === "BRIDGE" && project.category === "bridge") score += 22;
   if (criteria.programCode === "PROTECT" && project.tags.some((t) => /flood|coastal|evac/i.test(t))) score += 18;
   if (criteria.programCode === "CFI" && project.category === "ev-charging") score += 22;
+  if (criteria.programCode === "BUS") {
+    if (project.category === "transit" || project.tags.includes("transit") || project.modes.includes("transit")) {
+      score += 22;
+    }
+    if (project.category === "ev-charging") score += 8;
+  }
   if (criteria.programCode === "RAISE") {
     if (["complete-streets", "transit", "bike-ped"].includes(project.category)) score += 20;
     if (project.equity.disadvantagedCommunity) score += 8;

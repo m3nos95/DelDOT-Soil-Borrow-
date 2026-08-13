@@ -3,7 +3,7 @@ import path from "path";
 import { extractNofoCriteria } from "../lib/extract-nofo";
 import { matchProjects, scoreProject } from "../lib/matching";
 import { parseProjectCsv } from "../lib/parse-projects";
-import { SAMPLE_SS4A_NOFO, SAMPLE_BRIDGE_NOFO, SAMPLE_RAISE_NOFO } from "../lib/sample-nofo";
+import { SAMPLE_SS4A_NOFO, SAMPLE_BRIDGE_NOFO, SAMPLE_RAISE_NOFO, SAMPLE_BUS_NOFO } from "../lib/sample-nofo";
 import { getUnfundedProjects, TARGET_PROJECT_COUNT } from "../lib/sample-projects";
 import { describe, expect, it } from "vitest";
 
@@ -37,6 +37,21 @@ describe("NOFO extraction", () => {
   it("detects the Bridge Investment Program", () => {
     const criteria = extractNofoCriteria(SAMPLE_BRIDGE_NOFO, "bip.pdf");
     expect(criteria.programCode).toBe("BRIDGE");
+  });
+
+  it("does not treat an FTA bus Federal Register notice as INFRA", () => {
+    const frNotice = `
+FY 2026 Competitive Funding Opportunity: Grants for Buses and Bus
+Facilities Infrastructure Programs
+The Federal Transit Administration (FTA) announces the opportunity to apply for
+$610 million in competitive grants for the Fiscal Year (FY) 2026 Grants for Buses
+and Bus Facilities Program and Low or No Emission Grant Program.
+The funding opportunity IDs are FTA-2026-010-TPM-BUS and FTA-2026-011-TPM-LWNO.
+Authority: 49 U.S.C. 5339(b) and (c).
+`;
+    const criteria = extractNofoCriteria(frNotice, "2026-15090.pdf");
+    expect(criteria.programCode).toBe("BUS");
+    expect(criteria.programCode).not.toBe("INFRA");
   });
 });
 
@@ -83,5 +98,17 @@ describe("matching engine", () => {
     const criteria = extractNofoCriteria(SAMPLE_BRIDGE_NOFO, "bridge.pdf");
     const matches = matchProjects(projects, criteria);
     expect(matches[0]?.projectName.toLowerCase()).toMatch(/bridge/);
+  });
+
+  it("ranks transit projects above highway interchanges for FTA bus grants", () => {
+    const projects = getUnfundedProjects();
+    const criteria = extractNofoCriteria(SAMPLE_BUS_NOFO, "bus.pdf");
+    expect(criteria.programCode).toBe("BUS");
+    const matches = matchProjects(projects, criteria);
+    const transit = matches.find((m) => /transit|dart|bus/i.test(m.projectName));
+    const interchange = matches.find((m) => m.projectName.includes("Interchange"));
+    expect(transit).toBeTruthy();
+    expect(interchange).toBeTruthy();
+    expect(transit!.score).toBeGreaterThan(interchange!.score);
   });
 });
