@@ -1,5 +1,8 @@
+import { readFileSync } from "fs";
+import path from "path";
 import { extractNofoCriteria } from "../lib/extract-nofo";
 import { matchProjects, scoreProject } from "../lib/matching";
+import { parseProjectCsv } from "../lib/parse-projects";
 import { SAMPLE_SS4A_NOFO, SAMPLE_BRIDGE_NOFO, SAMPLE_RAISE_NOFO } from "../lib/sample-nofo";
 import { getUnfundedProjects, TARGET_PROJECT_COUNT } from "../lib/sample-projects";
 import { describe, expect, it } from "vitest";
@@ -11,6 +14,15 @@ describe("sample Unifier inventory", () => {
     expect(a).toHaveLength(TARGET_PROJECT_COUNT);
     expect(a[0]?.name).toBe("US 13 Intersection Safety Improvements");
     expect(a.map((p) => p.id)).toEqual(b.map((p) => p.id));
+  });
+
+  it("parses the 15-project sample CSV", () => {
+    const csv = readFileSync(path.join(process.cwd(), "public/samples/unfunded-projects-sample.csv"), "utf8");
+    const projects = parseProjectCsv(csv);
+    expect(projects).toHaveLength(15);
+    expect(projects[0]?.unifierId).toBe("UNF-1001");
+    expect(projects[0]?.name).toBe("US 13 Intersection Safety Improvements");
+    expect(projects[0]?.crashHistory.highCrashLocation).toBe(true);
   });
 });
 

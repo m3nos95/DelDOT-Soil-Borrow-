@@ -81,9 +81,48 @@ export default function UploadPage() {
               className="text-sm"
             />
           </div>
-          <a className="mt-1 inline-block text-xs text-deldot-blue hover:underline" href="/api/projects?sample=csv">
-            Download sample Unifier export (248 projects)
-          </a>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <a className="font-medium text-deldot-blue hover:underline" href="/samples/unfunded-projects-sample.csv">
+              Download 15-project sample CSV
+            </a>
+            <a className="font-medium text-deldot-blue hover:underline" href="/samples/unfunded-projects-template.csv">
+              Download blank-style template
+            </a>
+            <a className="text-deldot-blue hover:underline" href="/api/projects?sample=csv">
+              Full 248-project Unifier-style export
+            </a>
+          </div>
+
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+            <h3 className="font-semibold">Spreadsheet columns</h3>
+            <p className="mt-1 text-slate-600">
+              Only <strong>Project Name</strong> is required. Fill the others if you have them — they are what the matcher
+              uses for scores and explanations.
+            </p>
+            <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <div>
+                <dt className="font-semibold">Required</dt>
+                <dd className="text-slate-600">Project Name</dd>
+              </div>
+              <div>
+                <dt className="font-semibold">Strongly recommended</dt>
+                <dd className="text-slate-600">Description, Category, Unfunded Amount, Tags</dd>
+              </div>
+              <div>
+                <dt className="font-semibold">Helps safety / SS4A scoring</dt>
+                <dd className="text-slate-600">Fatalities 5yr, Serious Injuries 5yr, High Crash Location</dd>
+              </div>
+              <div>
+                <dt className="font-semibold">Helps equity / rural scoring</dt>
+                <dd className="text-slate-600">Disadvantaged Community, Rural, Environmental Justice</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-slate-600">
+              Category values: safety, bike-ped, complete-streets, bridge, pavement, transit, freight, resilience,
+              ev-charging, planning, signals. Readiness values: planning, preliminary-design, final-design, row,
+              construction-ready. True/false fields accept true, yes, y, or 1.
+            </p>
+          </div>
 
           <button
             type="submit"

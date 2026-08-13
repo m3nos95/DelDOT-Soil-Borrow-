@@ -26,6 +26,12 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). On the dashboard, click **Analyze Projects** to run the SS4A sample against the Unifier-style inventory.
 
+## Sample unfunded-projects CSV
+
+Use `public/samples/unfunded-projects-sample.csv` (15 Delaware example projects) or the shorter template `public/samples/unfunded-projects-template.csv`. With the app running you can also download them from **Upload**, or get a 248-row export at `/api/projects?sample=csv`.
+
+Only **Project Name** is required. Add Description, Category, Unfunded Amount, crash/equity flags, and Tags when you have them — those drive match scores.
+
 ## Pilot workflow
 
 | Step | Screen | Action |
