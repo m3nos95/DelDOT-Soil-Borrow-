@@ -147,6 +147,25 @@ const FEATURED: SeedSpec[] = [
     tags: ["transit", "signal", "equity", "pedestrian", "tsp"],
   },
   {
+    unifierId: "UNF-1016",
+    name: "DART Low-No Bus Fleet Replacement and Maintenance Facility",
+    description:
+      "Replace diesel buses with low- and no-emission transit buses and rehabilitate the DART bus maintenance garage, including depot charging and related equipment.",
+    county: "New Castle",
+    corridor: "Statewide",
+    category: "transit",
+    estimatedCost: 28600000,
+    unfundedAmount: 28600000,
+    status: "unfunded",
+    readiness: "final-design",
+    designPercent: 70,
+    modes: ["transit"],
+    yearNeeded: 2026,
+    crashHistory: { fatalities5yr: 0, seriousInjuries5yr: 1, highCrashLocation: false },
+    equity: { disadvantagedCommunity: true, rural: false, environmentalJustice: true },
+    tags: ["transit", "bus-fleet", "low-no", "garage", "zero-emission"],
+  },
+  {
     unifierId: "UNF-1006",
     name: "I-95 / SR 141 Interchange Safety and Operations",
     description:

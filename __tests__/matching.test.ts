@@ -105,20 +105,44 @@ describe("matching engine", () => {
     const criteria = extractNofoCriteria(SAMPLE_BUS_NOFO, "bus.pdf");
     expect(criteria.programCode).toBe("BUS");
     const matches = matchProjects(projects, criteria);
-    const transit = matches.find((m) => /transit|dart|bus/i.test(m.projectName));
+    const fleet = matches.find((m) => /bus fleet|low-no|maintenance facility/i.test(m.projectName));
     const interchange = matches.find((m) => m.projectName.includes("Interchange"));
-    expect(transit).toBeTruthy();
+    expect(fleet).toBeTruthy();
     expect(interchange).toBeTruthy();
-    expect(transit!.score).toBeGreaterThan(interchange!.score);
+    expect(fleet!.score).toBeGreaterThan(interchange!.score);
+    expect(fleet!.recommended).toBe(true);
+    expect(fleet!.fitBand).toBe("eligible");
   });
 
-  it("does not force highway projects as FTA bus recommendations", () => {
+  it("does not let crash or equity promote the wrong project type for FTA bus grants", () => {
     const matches = matchProjects(getUnfundedProjects(), extractNofoCriteria(SAMPLE_BUS_NOFO, "bus.pdf"));
     const downtown = matches.find((m) => m.projectName === "Georgetown Downtown Multimodal Safety Project");
-    expect(downtown?.score).toBeLessThanOrEqual(45);
+    const wilmington = matches.find((m) => m.projectName === "Wilmington High-Injury Network Complete Streets");
+    const tsp = matches.find((m) => m.projectName === "Dover Transit Signal Priority and Queue Jump");
+    const intersection = matches.find((m) => m.projectName === "US 13 Intersection Safety Improvements");
+
+    expect(downtown?.fitBand).toBe("ineligible");
+    expect(downtown?.score).toBeLessThanOrEqual(28);
     expect(downtown?.recommended).toBe(false);
+    expect(downtown?.whyItQualifies).toMatch(/not eligible/i);
+    expect(downtown?.whyItQualifies).not.toMatch(/crash|fatal|equity/i);
+
+    expect(wilmington?.fitBand).toBe("ineligible");
+    expect(wilmington?.score).toBeLessThanOrEqual(28);
+    expect(wilmington?.recommended).toBe(false);
+    expect(wilmington?.whyItQualifies).toMatch(/not eligible/i);
+
+    expect(tsp?.fitBand).toBe("adjacent");
+    expect(tsp?.score).toBeLessThanOrEqual(55);
+    expect(tsp?.recommended).toBe(false);
+
+    expect(intersection?.fitBand).toBe("ineligible");
+    expect(intersection?.recommended).toBe(false);
+
     for (const m of matches.filter((row) => row.recommended)) {
-      expect(m.projectName).toMatch(/transit|dart|bus|charging|signal/i);
+      expect(m.fitBand).toBe("eligible");
+      expect(m.projectName).toMatch(/bus|fleet|garage|low-?no|charging|facilit/i);
+      expect(m.projectName).not.toMatch(/complete streets|interchange|intersection safety|bicycle boulevard/i);
     }
   });
 });

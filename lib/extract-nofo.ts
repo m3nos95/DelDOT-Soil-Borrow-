@@ -312,7 +312,6 @@ export const PROGRAM_CATALOG: ProgramCatalog[] = [
         "bus maintenance facilities",
         "low-no emission buses",
         "transit charging",
-        "transit signal priority",
       ],
       keywords: [
         "transit",

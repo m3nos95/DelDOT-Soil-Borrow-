@@ -50,7 +50,7 @@ function AnalysisDetail() {
   const byId = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const focus = analysis?.matches.find((m) => m.projectId === focusId) ?? analysis?.matches[0];
   const focusProject = focus ? byId.get(focus.projectId) : undefined;
-  const rows = (analysis?.matches ?? []).filter((m) => (filter === "all" ? true : m.score >= 60));
+  const rows = (analysis?.matches ?? []).filter((m) => (filter === "all" ? true : m.recommended));
 
   async function sendFeedback() {
     if (!analysis || !reason.trim()) return;
@@ -106,7 +106,7 @@ function AnalysisDetail() {
               onChange={(e) => setFilter(e.target.value as "recommended" | "all")}
               className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
             >
-              <option value="recommended">Score 60%+</option>
+              <option value="recommended">Eligible recommendations</option>
               <option value="all">All projects</option>
             </select>
           </div>
@@ -121,6 +121,15 @@ function AnalysisDetail() {
                 </tr>
               </thead>
               <tbody>
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-500">
+                      {filter === "recommended"
+                        ? "No projects passed the eligibility gate for this NOFO."
+                        : "No projects in this analysis."}
+                    </td>
+                  </tr>
+                )}
                 {rows.slice(0, 80).map((m) => (
                   <tr
                     key={m.projectId}
@@ -167,6 +176,9 @@ function AnalysisDetail() {
           {focus && (
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
               <h3 className="font-semibold">{focus.projectName}</h3>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Eligibility: {focus.fitBand}
+              </p>
               {focusProject && (
                 <p className="mt-1 text-sm text-slate-600">
                   {focusProject.unifierId} · {focusProject.county} · {focusProject.corridor} ·{" "}

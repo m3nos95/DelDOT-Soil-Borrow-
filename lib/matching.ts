@@ -1,5 +1,5 @@
 import { HISTORIC_AWARDS } from "./historic";
-import type { Analysis, Feedback, MatchResult, NofoCriteria, Project, ScoreBreakdown } from "./types";
+import type { Analysis, Feedback, FitBand, MatchResult, NofoCriteria, Project, ScoreBreakdown } from "./types";
 import { clamp } from "./utils";
 
 const WEIGHTS = {
@@ -15,11 +15,112 @@ const CATEGORY_PROGRAM: Record<string, string[]> = {
   RAISE: ["complete-streets", "transit", "bike-ped", "bridge", "freight", "safety"],
   BRIDGE: ["bridge"],
   PROTECT: ["resilience"],
-  INFRA: ["freight", "safety"],
+  INFRA: ["freight"],
   CFI: ["ev-charging"],
-  BUS: ["transit", "ev-charging", "signals"],
+  BUS: ["transit"],
   CUSTOM: [],
 };
+
+function isSafetyProgram(criteria: NofoCriteria): boolean {
+  return criteria.programCode === "SS4A" || /^safe streets/i.test(criteria.programName);
+}
+
+function fitMultiplier(band: FitBand): number {
+  if (band === "eligible") return 1;
+  if (band === "adjacent") return 0.55;
+  return 0.15;
+}
+
+const CORE_TERMS: Record<string, RegExp[]> = {
+  SS4A: [/\bsafety\b/, /high[\s-]*crash/, /vru/, /pedestrian/, /bicycle/, /complete[\s-]*street/, /action plan/, /intersection/, /signal/],
+  BRIDGE: [/\bbridge/, /structurally[\s-]*deficient/, /load[\s-]*post/],
+  PROTECT: [/resilience/, /flood/, /coastal/, /evac/],
+  INFRA: [/freight/, /bottleneck/, /intermodal/, /truck parking/],
+  CFI: [/charging/, /alternative[\s-]*fuel/, /\bev\b/, /hydrogen/],
+  BUS: [
+    /\bbuses\b/,
+    /bus (?:fleet|facilit|garage|yard|maintenance|purchase|replac|rehab|vehicle)/,
+    /transit buses?\b/,
+    /low[\s-]*no/,
+    /zero[\s-]*emission/,
+    /(?:bus|transit|fleet).{0,32}(?:charg|recharg|refuel)/,
+    /(?:charg|recharg|refuel).{0,32}(?:bus|transit|fleet)/,
+  ],
+  RAISE: [/\bmultimodal\b/, /complete[\s-]*street/, /transit/, /connectivity/, /quality of life/],
+};
+
+const ADJACENT_TERMS: Record<string, RegExp[]> = {
+  BUS: [/bus stop/, /bus lane/, /transit signal/, /\btsp\b/, /queue jump/, /dart stop/, /transit access/],
+};
+
+const REJECT_TERMS: Record<string, RegExp[]> = {
+  BUS: [
+    /interchange/,
+    /freight bottleneck/,
+    /pavement/,
+    /bicycle boulevard/,
+    /lane[- ]departure/,
+    /bridge rehabilitation/,
+    /complete streets/,
+    /intersection safety/,
+    /road[- ]diet/,
+  ],
+  BRIDGE: [/bicycle/, /complete streets/, /transit signal/, /charging hub/],
+  CFI: [/bridge rehabilitation/, /pavement preservation/, /lane[- ]departure/],
+  PROTECT: [/pavement preservation/, /bicycle boulevard/],
+  INFRA: [/bicycle boulevard/, /safety action plan/, /sidewalk and crossing/],
+};
+
+function projectBlob(project: Project): string {
+  return [project.name, project.description, project.category, project.tags.join(" "), project.modes.join(" ")]
+    .join(" ")
+    .toLowerCase()
+    .replace(/-/g, " ");
+}
+
+function screenProject(project: Project, criteria: NofoCriteria): { band: FitBand; reason: string } {
+  const blob = projectBlob(project);
+  const code = criteria.programCode;
+  const favored = CATEGORY_PROGRAM[code] ?? [];
+  const hasCore = (CORE_TERMS[code] ?? []).some((re) => re.test(blob));
+  const hasReject = (REJECT_TERMS[code] ?? []).some((re) => re.test(blob));
+  const hasAdjacent = (ADJACENT_TERMS[code] ?? []).some((re) => re.test(blob));
+  const favoredCat = favored.includes(project.category);
+  const prettyCat = project.category.replace(/-/g, " ");
+
+  if (hasReject && !hasCore) {
+    return {
+      band: "ineligible",
+      reason: `Not eligible for ${criteria.programName}: this is ${prettyCat} work, not ${criteria.programCode}-eligible capital scope.`,
+    };
+  }
+  if (hasReject && hasCore) {
+    return {
+      band: "adjacent",
+      reason: `Mixed scope for ${criteria.programName}: some related elements appear, but the primary work is not a core eligible activity.`,
+    };
+  }
+  if (hasCore) return { band: "eligible", reason: "" };
+  if (favoredCat && ["BRIDGE", "PROTECT", "CFI"].includes(code)) return { band: "eligible", reason: "" };
+  if (hasAdjacent || favoredCat) {
+    return {
+      band: "adjacent",
+      reason: `Related to ${criteria.programName}, but not a core eligible activity (for example fleet, facility, or program-specific capital work).`,
+    };
+  }
+  if (!favored.length) {
+    const hit = keywordHits(projectTokens(project), [...criteria.eligibleProjectTypes, ...criteria.keywords]);
+    if (hit >= 0.35) return { band: "eligible", reason: "" };
+    if (hit >= 0.15) {
+      return { band: "adjacent", reason: "Only partial keyword overlap with extracted NOFO requirements." };
+    }
+    return { band: "ineligible", reason: `Not a clear fit for ${criteria.programName}.` };
+  }
+  return {
+    band: "ineligible",
+    reason: `Not eligible for ${criteria.programName}: project type (${prettyCat}) is outside this NOFO.`,
+  };
+}
 
 const SYNONYMS: Record<string, string[]> = {
   death: ["fatality", "fatalities", "killed"],
@@ -78,17 +179,9 @@ function projectTokens(project: Project): Set<string> {
   );
 }
 
-function typeFit(project: Project, criteria: NofoCriteria): number {
-  const favored = CATEGORY_PROGRAM[criteria.programCode] ?? [];
-  if (!favored.length) return 0.55;
-  if (favored.includes(project.category)) return 1;
-  if (favored.some((c) => project.tags.includes(c))) return 0.7;
-  return 0.25;
-}
-
-function eligibilityScore(project: Project, criteria: NofoCriteria, tokens: Set<string>): number {
-  const fit = typeFit(project, criteria);
-  let score = 38 + fit * 40 + keywordHits(tokens, [...criteria.eligibleProjectTypes, ...criteria.keywords]) * 16;
+function eligibilityScore(project: Project, criteria: NofoCriteria, tokens: Set<string>, band: FitBand): number {
+  if (band === "ineligible") return 18;
+  let score = 38 + fitMultiplier(band) * 40 + keywordHits(tokens, [...criteria.eligibleProjectTypes, ...criteria.keywords]) * 16;
   if (criteria.awardRange) {
     const { min = 0, max = Number.POSITIVE_INFINITY } = criteria.awardRange;
     if (project.unfundedAmount >= min && project.unfundedAmount <= max * 1.4) score += 8;
@@ -102,74 +195,74 @@ function eligibilityScore(project: Project, criteria: NofoCriteria, tokens: Set<
   return clamp(score);
 }
 
-function evaluationScore(project: Project, criteria: NofoCriteria, tokens: Set<string>): number {
+function evaluationScore(project: Project, criteria: NofoCriteria, tokens: Set<string>, band: FitBand): number {
+  if (band === "ineligible") return 16;
   let score = 32 + keywordHits(tokens, criteria.evaluationCriteria) * 20;
-  const safetyProgram = criteria.programCode === "SS4A" || /safety/i.test(criteria.programName);
-  if (safetyProgram) {
+  const safety = isSafetyProgram(criteria);
+  if (safety && band === "eligible") {
     score += Math.min(28, project.crashHistory.fatalities5yr * 4 + project.crashHistory.seriousInjuries5yr * 0.35);
     if (project.crashHistory.highCrashLocation) score += 12;
   }
-  if (criteria.evaluationCriteria.some((c) => /equity|underserved|justice/i.test(c))) {
+  if (band === "eligible" && criteria.evaluationCriteria.some((c) => /equity|underserved|justice/i.test(c))) {
     if (project.equity.disadvantagedCommunity) score += 10;
     if (project.equity.environmentalJustice) score += 5;
   }
-  if (criteria.evaluationCriteria.some((c) => /readiness|schedule/i.test(c))) {
-    score += project.designPercent / 10;
+  if (criteria.evaluationCriteria.some((c) => /readiness|schedule|implementation/i.test(c))) {
+    score += project.designPercent / 12;
   }
   if (criteria.programCode === "BRIDGE" && project.category === "bridge") score += 22;
   if (criteria.programCode === "PROTECT" && project.tags.some((t) => /flood|coastal|evac/i.test(t))) score += 18;
   if (criteria.programCode === "CFI" && project.category === "ev-charging") score += 22;
-  if (criteria.programCode === "BUS") {
-    if (project.category === "transit" || project.tags.includes("transit") || project.modes.includes("transit")) {
-      score += 22;
-    }
-    if (project.category === "ev-charging") score += 8;
-  }
-  if (criteria.programCode === "RAISE") {
+  if (criteria.programCode === "BUS" && band === "eligible") score += 22;
+  if (criteria.programCode === "RAISE" && band !== "ineligible") {
     if (["complete-streets", "transit", "bike-ped"].includes(project.category)) score += 20;
     if (project.equity.disadvantagedCommunity) score += 8;
     if (project.modes.length >= 3) score += 8;
   }
-  if (criteria.programCode === "INFRA" && (project.category === "freight" || project.tags.includes("interstate"))) {
+  if (criteria.programCode === "INFRA" && band === "eligible" && (project.category === "freight" || project.tags.includes("interstate"))) {
     score += 18;
   }
-  score *= 0.55 + 0.45 * typeFit(project, criteria);
+  score *= 0.55 + 0.45 * fitMultiplier(band);
   return clamp(score);
 }
 
-function priorityScore(project: Project, criteria: NofoCriteria, tokens: Set<string>): number {
+function priorityScore(project: Project, criteria: NofoCriteria, tokens: Set<string>, band: FitBand): number {
+  if (band === "ineligible") return 14;
   let score = 30 + keywordHits(tokens, [...criteria.programPriorities, ...criteria.keywords]) * 28;
   const blob = criteria.programPriorities.join(" ").toLowerCase();
-  if ((blob.includes("vulnerable") || blob.includes("pedestrian")) && project.modes.some((m) => /pedestrian|bicycle/.test(m))) {
+  const safety = isSafetyProgram(criteria);
+  if (safety && band === "eligible" && (blob.includes("vulnerable") || blob.includes("pedestrian")) && project.modes.some((m) => /pedestrian|bicycle/.test(m))) {
     score += 14;
   }
-  if (blob.includes("rural") && project.equity.rural) score += 10;
-  if (blob.includes("complete") && (project.category === "complete-streets" || project.tags.includes("complete-streets"))) {
+  if (band !== "ineligible" && blob.includes("rural") && project.equity.rural) score += 10;
+  if (safety && blob.includes("complete") && (project.category === "complete-streets" || project.tags.includes("complete-streets"))) {
     score += 12;
   }
-  if (blob.includes("data-driven") && (project.category === "planning" || project.crashHistory.highCrashLocation)) {
+  if (safety && blob.includes("data-driven") && (project.category === "planning" || project.crashHistory.highCrashLocation)) {
     score += 10;
   }
-  if (blob.includes("death") || blob.includes("fatal")) {
+  if (safety && band === "eligible" && (blob.includes("death") || blob.includes("fatal"))) {
     score += Math.min(16, project.crashHistory.fatalities5yr * 3);
   }
-  score *= 0.6 + 0.4 * typeFit(project, criteria);
+  score *= 0.6 + 0.4 * fitMultiplier(band);
   return clamp(score);
 }
 
-function fundingScore(project: Project, criteria: NofoCriteria, tokens: Set<string>): number {
+function fundingScore(project: Project, criteria: NofoCriteria, tokens: Set<string>, band: FitBand): number {
+  if (band === "ineligible") return 20;
   let score = 42 + keywordHits(tokens, criteria.fundingObjectives) * 18;
   const blob = criteria.fundingObjectives.join(" ").toLowerCase();
   if (blob.includes("implementation") && project.designPercent >= 60) score += 16;
   if (blob.includes("planning") && project.category === "planning") score += 18;
   if (blob.includes("construction") && project.readiness === "construction-ready") score += 10;
-  if (typeFit(project, criteria) < 0.4) score -= 18;
+  if (band === "adjacent") score -= 12;
   return clamp(score);
 }
 
-function historicScore(project: Project, criteria: NofoCriteria, feedbackBoost = 0): number {
+function historicScore(project: Project, criteria: NofoCriteria, band: FitBand, feedbackBoost = 0): number {
+  if (band === "ineligible") return clamp(22 + feedbackBoost);
   const related = HISTORIC_AWARDS.filter(
-    (h) => h.programCode === criteria.programCode || h.category === project.category,
+    (h) => h.programCode === criteria.programCode || (band === "eligible" && h.category === project.category),
   );
   if (!related.length) return clamp(52 + feedbackBoost);
   let score = 48;
@@ -195,26 +288,44 @@ function feedbackBoostFor(project: Project, feedback: Feedback[]): number {
   return boost;
 }
 
-function explain(project: Project, criteria: NofoCriteria, breakdown: ScoreBreakdown): {
+function explain(
+  project: Project,
+  criteria: NofoCriteria,
+  breakdown: ScoreBreakdown,
+  band: FitBand,
+  screenReason: string,
+): {
   why: string;
   strengths: string[];
   gaps: string[];
 } {
+  if (band === "ineligible") {
+    return {
+      why: screenReason,
+      strengths: [],
+      gaps: [screenReason, `Project type is ${project.category.replace(/-/g, " ")}`],
+    };
+  }
+
   const strengths: string[] = [];
   const gaps: string[] = [];
+  const safety = isSafetyProgram(criteria);
 
-  if (project.crashHistory.highCrashLocation) {
+  if (band === "adjacent") {
+    gaps.push(screenReason);
+  }
+  if (safety && project.crashHistory.highCrashLocation) {
     strengths.push(
       `High-crash location: ${project.crashHistory.fatalities5yr} fatalities and ${project.crashHistory.seriousInjuries5yr} serious injuries in 5 years`,
     );
   }
-  if (project.equity.disadvantagedCommunity) {
+  if (band === "eligible" && project.equity.disadvantagedCommunity && criteria.evaluationCriteria.some((c) => /equity|underserved|justice/i.test(c))) {
     strengths.push("Serves a disadvantaged / underserved community (equity criterion)");
   }
   if (project.designPercent >= 70) {
-    strengths.push(`Strong readiness (${project.designPercent}% design, ${project.readiness.replace("-", " ")})`);
+    strengths.push(`Strong readiness (${project.designPercent}% design, ${project.readiness.replace(/-/g, " ")})`);
   }
-  if (project.modes.includes("pedestrian") || project.modes.includes("bicycle")) {
+  if (safety && (project.modes.includes("pedestrian") || project.modes.includes("bicycle"))) {
     strengths.push("Includes vulnerable road user accommodations");
   }
   if (project.category === "planning" && criteria.programCode === "SS4A") {
@@ -223,14 +334,17 @@ function explain(project: Project, criteria: NofoCriteria, breakdown: ScoreBreak
   if (project.category === "bridge" && criteria.programCode === "BRIDGE") {
     strengths.push("Directly addresses structurally deficient / load-posted bridge needs");
   }
-  if (project.tags.includes("complete-streets") || project.category === "complete-streets") {
+  if (safety && (project.tags.includes("complete-streets") || project.category === "complete-streets")) {
     strengths.push("Complete Streets elements match program priorities");
   }
-  if (project.equity.rural && /rural/i.test([...criteria.programPriorities, ...criteria.evaluationCriteria].join(" "))) {
+  if (criteria.programCode === "BUS" && band === "eligible") {
+    strengths.push("Aligns with FTA bus fleet, facility, or low/no-emission capital eligibility");
+  }
+  if (band === "eligible" && project.equity.rural && /rural/i.test([...criteria.programPriorities, ...criteria.evaluationCriteria].join(" "))) {
     strengths.push("Rural location supports geographic diversity / rural set-aside");
   }
 
-  if (!project.crashHistory.highCrashLocation && (criteria.programCode === "SS4A" || /safety/i.test(criteria.programName))) {
+  if (safety && !project.crashHistory.highCrashLocation) {
     gaps.push("Limited documented fatal/serious crash history compared with top safety candidates");
   }
   if (project.designPercent < 40 && !/planning/i.test(criteria.fundingObjectives.join(" "))) {
@@ -239,19 +353,16 @@ function explain(project: Project, criteria: NofoCriteria, breakdown: ScoreBreak
   if (criteria.awardRange?.max && project.unfundedAmount > criteria.awardRange.max * 1.5) {
     gaps.push("Requested amount is large relative to typical award range — consider phasing");
   }
-  if (!project.equity.disadvantagedCommunity && criteria.evaluationCriteria.some((c) => /equity/i.test(c))) {
-    gaps.push("Equity narrative is weaker than competing projects in Justice40 / underserved areas");
-  }
-  if (
-    (CATEGORY_PROGRAM[criteria.programCode] ?? []).length &&
-    !(CATEGORY_PROGRAM[criteria.programCode] ?? []).includes(project.category)
-  ) {
-    gaps.push(`Project type (${project.category}) is not a primary fit for ${criteria.programCode}`);
+
+  if (band === "adjacent") {
+    return {
+      why: screenReason,
+      strengths: strengths.slice(0, 3),
+      gaps: gaps.slice(0, 3),
+    };
   }
 
-  const lead =
-    strengths[0] ??
-    `Partial alignment with ${criteria.programName} based on project description and Unifier attributes`;
+  const lead = strengths[0] ?? `Aligns with ${criteria.programName} eligible project types.`;
   const extra = strengths.slice(1, 3).join("; ");
   const why = extra ? `${lead.replace(/\.$/, "")}; ${extra.toLowerCase()}.` : `${lead.replace(/\.$/, "")}.`;
 
@@ -273,13 +384,13 @@ export function scoreProject(
 ): Omit<MatchResult, "rank" | "recommended"> {
   const tokens = projectTokens(project);
   const boost = feedbackBoostFor(project, priorFeedback);
-  const fit = typeFit(project, criteria);
+  const { band, reason } = screenProject(project, criteria);
   const breakdown: ScoreBreakdown = {
-    eligibility: eligibilityScore(project, criteria, tokens),
-    evaluation: evaluationScore(project, criteria, tokens),
-    priorities: priorityScore(project, criteria, tokens),
-    fundingObjectives: fundingScore(project, criteria, tokens),
-    historic: historicScore(project, criteria, boost),
+    eligibility: eligibilityScore(project, criteria, tokens, band),
+    evaluation: evaluationScore(project, criteria, tokens, band),
+    priorities: priorityScore(project, criteria, tokens, band),
+    fundingObjectives: fundingScore(project, criteria, tokens, band),
+    historic: historicScore(project, criteria, band, boost),
   };
   let score =
     breakdown.eligibility * WEIGHTS.eligibility +
@@ -287,14 +398,15 @@ export function scoreProject(
     breakdown.priorities * WEIGHTS.priorities +
     breakdown.fundingObjectives * WEIGHTS.fundingObjectives +
     breakdown.historic * WEIGHTS.historic;
-  if (fit < 0.4) score = Math.min(score, 45);
-  else if (fit < 0.7) score = Math.min(score, 62);
+  if (band === "ineligible") score = Math.min(score, 28);
+  else if (band === "adjacent") score = Math.min(score, 55);
   score = clamp(score);
-  const { why, strengths, gaps } = explain(project, criteria, breakdown);
+  const { why, strengths, gaps } = explain(project, criteria, breakdown, band, reason);
   return {
     projectId: project.id,
     projectName: project.name,
     score: Math.round(score),
+    fitBand: band,
     breakdown: {
       eligibility: Math.round(breakdown.eligibility),
       evaluation: Math.round(breakdown.evaluation),
@@ -313,20 +425,14 @@ export function matchProjects(
   criteria: NofoCriteria,
   priorFeedback: Feedback[] = [],
 ): MatchResult[] {
-  const byId = new Map(projects.map((p) => [p.id, p]));
-  const scored = projects
+  return projects
     .map((p) => scoreProject(p, criteria, priorFeedback))
     .sort((a, b) => b.score - a.score)
-    .map((m, i) => {
-      const project = byId.get(m.projectId);
-      const fit = project ? typeFit(project, criteria) : 0;
-      return {
-        ...m,
-        rank: i + 1,
-        recommended: m.score >= 70 && fit >= 0.7 && i < 12,
-      };
-    });
-  return scored;
+    .map((m, i) => ({
+      ...m,
+      rank: i + 1,
+      recommended: m.score >= 70 && m.fitBand === "eligible" && i < 12,
+    }));
 }
 
 export function buildInsight(matches: MatchResult[], criteria: NofoCriteria, projectCount: number): string {

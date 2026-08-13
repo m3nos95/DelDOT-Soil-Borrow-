@@ -6,6 +6,7 @@ export function analysisToCsv(analysis: Analysis, projects: Project[]): string {
   const headers = [
     "Rank",
     "Match Score",
+    "Eligibility",
     "Recommended",
     "Final Selection",
     "Unifier ID",
@@ -23,6 +24,7 @@ export function analysisToCsv(analysis: Analysis, projects: Project[]): string {
     return [
       m.rank,
       m.score,
+      m.fitBand,
       m.recommended ? "Yes" : "No",
       analysis.finalSelections.includes(m.projectId) ? "Yes" : "No",
       p?.unifierId ?? "",

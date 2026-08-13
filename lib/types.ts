@@ -70,11 +70,14 @@ export type ScoreBreakdown = {
   historic: number;
 };
 
+export type FitBand = "eligible" | "adjacent" | "ineligible";
+
 export type MatchResult = {
   projectId: string;
   projectName: string;
   rank: number;
   score: number;
+  fitBand: FitBand;
   breakdown: ScoreBreakdown;
   whyItQualifies: string;
   strengths: string[];
