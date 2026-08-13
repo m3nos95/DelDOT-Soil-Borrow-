@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-[#eef3f8] text-navy-900 antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b7c4d3;
+  border-radius: 999px;
+}
+
+.score-bar {
+  background: linear-gradient(90deg, #1f7a4d, #c9a227, #c45c1a);
+}
