@@ -29,8 +29,8 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-screen w-[232px] shrink-0 flex-col bg-navy-900 text-white">
-      <div className="flex items-center gap-3 px-5 pb-4 pt-6">
-        <DelDotSeal className="h-11 w-11" />
+      <div className="flex items-center gap-3 px-4 pb-4 pt-6">
+        <DelDotSeal className="h-14 w-14 shrink-0" />
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
             DelDOT
@@ -61,7 +61,7 @@ export function Sidebar() {
         })}
       </nav>
       <div className="m-3 rounded-lg border border-white/15 bg-white/8 p-3 text-[11px] leading-relaxed text-white/80">
-        <div className="mb-1 font-semibold uppercase tracking-wide text-deldot-gold">Pilot Mode</div>
+        <div className="mb-1 font-semibold uppercase tracking-wide text-deldot-orange">Pilot Mode</div>
         This is a Phase 1 Pilot. Results should be reviewed and validated by the Grant Manager.
       </div>
     </aside>

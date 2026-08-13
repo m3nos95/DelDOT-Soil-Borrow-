@@ -18,10 +18,10 @@ const config: Config = {
         },
         deldot: {
           blue: "#0b5cab",
-          gold: "#c9a227",
+          gold: "#f27036",
           green: "#1f7a4d",
           amber: "#c47b17",
-          orange: "#c45c1a",
+          orange: "#f27036",
         },
       },
       fontFamily: {

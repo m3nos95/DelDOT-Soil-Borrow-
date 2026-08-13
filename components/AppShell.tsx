@@ -1,6 +1,7 @@
 "use client";
 
 import { Sidebar } from "./Sidebar";
+import { DelDotSeal } from "./DelDotSeal";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -8,13 +9,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="min-w-0 flex-1">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-navy-600">
-              Delaware Department of Transportation
+          <div className="flex items-center gap-3">
+            <DelDotSeal className="h-10 w-10" />
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-navy-600">
+                Delaware Department of Transportation
+              </div>
+              <h1 className="text-lg font-semibold text-navy-900">AI Grant Matching Agent (Phase 1 Pilot)</h1>
             </div>
-            <h1 className="text-lg font-semibold text-navy-900">AI Grant Matching Agent (Phase 1 Pilot)</h1>
           </div>
-          <div className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
+          <div className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-900">
             Human-in-the-loop · Grant Manager decides
           </div>
         </header>

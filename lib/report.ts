@@ -86,10 +86,15 @@ export function analysisReportHtml(analysis: Analysis, projects: Project[]): str
     th { background: #0b2545; color: white; }
     .banner { background: #fff6c8; padding: 10px 12px; border-radius: 6px; margin: 16px 0; }
     .meta { display: flex; gap: 24px; margin: 12px 0 20px; font-size: 13px; }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .brand img { width: 56px; height: 56px; }
   </style>
 </head>
 <body>
-  <p class="muted">Delaware Department of Transportation · AI Grant Matching Agent · Phase 1 Pilot</p>
+  <div class="brand">
+    <img src="/deldot-logo.png" alt="Delaware Department of Transportation" />
+    <p class="muted">Delaware Department of Transportation · AI Grant Matching Agent · Phase 1 Pilot</p>
+  </div>
   <h1>${analysis.nofoName}</h1>
   <div class="meta">
     <div>File: ${analysis.nofoFileName}</div>
