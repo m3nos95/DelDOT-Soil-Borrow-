@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { WorkflowBar } from "./WorkflowBar";
 import { ScoreBadge } from "./ScoreBadge";
-import type { Analysis } from "@/lib/types";
+import { TARGET_PROJECT_COUNT } from "@/lib/sample-projects";
 import { formatDate, formatDateTime, titleCase } from "@/lib/utils";
 
 type Summary = {
@@ -276,7 +276,7 @@ export function DashboardClient() {
             <h3 className="mb-3 text-sm font-semibold">Analysis Summary</h3>
             <dl className="space-y-2 text-sm">
               <Row label="NOFO" value={analysis?.nofoFileName ?? nofoName} />
-              <Row label="Projects" value={`${analysis?.projectCount ?? 248} projects`} />
+              <Row label="Projects" value={`${analysis?.projectCount ?? TARGET_PROJECT_COUNT} projects`} />
               <Row label="Status" value={analysis ? titleCase(analysis.status) : "Not started"} />
               <Row label="Uploaded" value={analysis ? formatDateTime(analysis.createdAt) : "Sample files ready"} />
             </dl>

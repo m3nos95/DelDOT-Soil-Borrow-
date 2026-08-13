@@ -8,12 +8,17 @@ import { getUnfundedProjects, TARGET_PROJECT_COUNT } from "../lib/sample-project
 import { describe, expect, it } from "vitest";
 
 describe("sample Unifier inventory", () => {
-  it("builds a deterministic 248-project unfunded list", () => {
+  it("builds a deterministic 2,500-project Unifier-style unfunded list", () => {
     const a = getUnfundedProjects();
     const b = getUnfundedProjects();
     expect(a).toHaveLength(TARGET_PROJECT_COUNT);
     expect(a[0]?.name).toBe("US 13 Intersection Safety Improvements");
     expect(a.map((p) => p.id)).toEqual(b.map((p) => p.id));
+    expect(new Set(a.map((p) => p.name)).size).toBe(TARGET_PROJECT_COUNT);
+    expect(new Set(a.map((p) => p.category)).size).toBeGreaterThanOrEqual(10);
+    expect(a.some((p) => p.county === "New Castle")).toBe(true);
+    expect(a.some((p) => p.county === "Kent")).toBe(true);
+    expect(a.some((p) => p.county === "Sussex")).toBe(true);
   });
 
   it("parses the 15-project sample CSV", () => {
@@ -23,6 +28,14 @@ describe("sample Unifier inventory", () => {
     expect(projects[0]?.unifierId).toBe("UNF-1001");
     expect(projects[0]?.name).toBe("US 13 Intersection Safety Improvements");
     expect(projects[0]?.crashHistory.highCrashLocation).toBe(true);
+  });
+
+  it("ships a 2,500-row Unifier-style CSV export", () => {
+    const csv = readFileSync(path.join(process.cwd(), "public/samples/unfunded-projects-unifier-full.csv"), "utf8");
+    const projects = parseProjectCsv(csv);
+    expect(projects).toHaveLength(TARGET_PROJECT_COUNT);
+    expect(projects[0]?.name).toBe("US 13 Intersection Safety Improvements");
+    expect(new Set(projects.map((p) => p.name)).size).toBe(TARGET_PROJECT_COUNT);
   });
 });
 

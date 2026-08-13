@@ -85,11 +85,14 @@ export default function UploadPage() {
             <a className="font-medium text-deldot-blue hover:underline" href="/samples/unfunded-projects-sample.csv">
               Download 15-project sample CSV
             </a>
+            <a className="font-medium text-deldot-blue hover:underline" href="/samples/unfunded-projects-unifier-full.csv">
+              Download 2,500-project Unifier-style export
+            </a>
             <a className="font-medium text-deldot-blue hover:underline" href="/samples/unfunded-projects-template.csv">
               Download blank-style template
             </a>
             <a className="text-deldot-blue hover:underline" href="/api/projects?sample=csv">
-              Full 248-project Unifier-style export
+              Same full export from the running app
             </a>
           </div>
 

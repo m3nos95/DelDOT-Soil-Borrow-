@@ -3,25 +3,45 @@ import type { Project, ProjectCategory } from "./types";
 const COUNTIES = ["New Castle", "Kent", "Sussex"] as const;
 const CORRIDORS = [
   "US 13",
-  "US 113",
   "US 40",
+  "US 113",
   "US 202",
+  "US 301",
   "SR 1",
-  "SR 141",
-  "SR 52",
-  "SR 72",
-  "SR 273",
-  "SR 896",
+  "SR 2",
+  "SR 4",
+  "SR 7",
+  "SR 8",
+  "SR 9",
+  "SR 10",
+  "SR 14",
+  "SR 16",
+  "SR 18",
+  "SR 20",
   "SR 24",
   "SR 26",
-  "SR 404",
-  "I-95",
-  "I-495",
-  "I-295",
+  "SR 30",
+  "SR 36",
+  "SR 42",
+  "SR 48",
+  "SR 52",
   "SR 54",
-  "SR 18",
-  "SR 8",
-  "SR 10",
+  "SR 58",
+  "SR 71",
+  "SR 72",
+  "SR 82",
+  "SR 92",
+  "SR 141",
+  "SR 202",
+  "SR 273",
+  "SR 299",
+  "SR 300",
+  "SR 404",
+  "SR 896",
+  "I-95",
+  "I-295",
+  "I-495",
+  "DE 1",
 ];
 
 const PLACES: Record<(typeof COUNTIES)[number], string[]> = {
@@ -34,8 +54,46 @@ const PLACES: Record<(typeof COUNTIES)[number], string[]> = {
     "Elsmere",
     "Claymont",
     "Pike Creek",
+    "Hockessin",
+    "Greenville",
+    "Newport",
+    "Delaware City",
+    "Townsend",
+    "Odessa",
+    "Christiana",
+    "Glasgow",
+    "St. Georges",
+    "Bellefonte",
+    "Arden",
+    "Port Penn",
+    "Kirkwood",
+    "Red Lion",
+    "Stanton",
+    "Edgemoor",
   ],
-  Kent: ["Dover", "Smyrna", "Camden", "Harrington", "Milford", "Clayton", "Felton"],
+  Kent: [
+    "Dover",
+    "Smyrna",
+    "Camden",
+    "Harrington",
+    "Milford",
+    "Clayton",
+    "Felton",
+    "Cheswold",
+    "Wyoming",
+    "Magnolia",
+    "Kenton",
+    "Hartly",
+    "Little Creek",
+    "Leipsic",
+    "Bowers",
+    "Frederica",
+    "Houston",
+    "Viola",
+    "Woodside",
+    "Rising Sun",
+    "Camden-Wyoming",
+  ],
   Sussex: [
     "Georgetown",
     "Lewes",
@@ -45,6 +103,25 @@ const PLACES: Record<(typeof COUNTIES)[number], string[]> = {
     "Milton",
     "Laurel",
     "Bridgeville",
+    "Milford",
+    "Bethany Beach",
+    "Fenwick Island",
+    "Ocean View",
+    "Millville",
+    "Dagsboro",
+    "Frankford",
+    "Selbyville",
+    "Delmar",
+    "Blades",
+    "Greenwood",
+    "Ellendale",
+    "Lincoln",
+    "Long Neck",
+    "Dewey Beach",
+    "Henlopen Acres",
+    "Slaughter Beach",
+    "Bethel",
+    "Gumboro",
   ],
 };
 
@@ -357,112 +434,275 @@ const FEATURED: SeedSpec[] = [
   },
 ];
 
+type NameCtx = {
+  place: string;
+  corridor: string;
+  county: string;
+  contract: string;
+  mp: string;
+  phase: string;
+};
+
+const PHASES = ["Phase 1", "Phase 2", "Northbound", "Southbound", "Group A", "Group B", "FY26", "FY27"] as const;
+
 const TEMPLATES: Array<{
   category: ProjectCategory;
-  name: (place: string, corridor: string, n: number) => string;
-  description: (place: string, corridor: string) => string;
+  weight: number;
+  name: (ctx: NameCtx) => string;
+  description: (ctx: NameCtx) => string;
   tags: string[];
   modes: string[];
   cost: [number, number];
 }> = [
   {
     category: "safety",
-    name: (place, corridor) => `${corridor} ${place} Intersection Safety Package`,
-    description: (place, corridor) =>
-      `Signal timing, visibility, and pedestrian interval upgrades at ${corridor} intersections serving ${place}.`,
-    tags: ["intersection", "signal", "safety", "pedestrian"],
+    weight: 8,
+    name: (c) => `${c.contract} ${c.corridor} Intersection Safety Package — ${c.place} ${c.phase}`,
+    description: (c) =>
+      `Systemic safety package at ${c.corridor} ${c.mp} serving ${c.place}: signal upgrades, left-turn protection, lighting, and pedestrian intervals.`,
+    tags: ["intersection", "signal", "safety", "pedestrian", "high-crash"],
     modes: ["auto", "pedestrian"],
     cost: [2_500_000, 16_000_000],
   },
   {
+    category: "safety",
+    weight: 5,
+    name: (c) => `${c.contract} ${c.corridor} Lane Departure Countermeasures — ${c.place}`,
+    description: (c) =>
+      `Rumble strips, high-friction surface treatment, and curve warning upgrades on ${c.corridor} ${c.mp} near ${c.place}.`,
+    tags: ["lane-departure", "rural", "high-friction", "systemic", "safety"],
+    modes: ["auto"],
+    cost: [1_800_000, 9_500_000],
+  },
+  {
+    category: "safety",
+    weight: 3,
+    name: (c) => `${c.contract} ${c.place} School Zone and Speed Management`,
+    description: (c) =>
+      `School-zone flashers, gateway treatments, and speed management on local streets feeding ${c.corridor} in ${c.place}.`,
+    tags: ["safety", "school", "speed-management", "lighting"],
+    modes: ["auto", "pedestrian"],
+    cost: [900_000, 5_500_000],
+  },
+  {
     category: "bike-ped",
-    name: (place) => `${place} Sidewalk and Crossing Gap Closure`,
-    description: (place, corridor) =>
-      `Fill sidewalk gaps and add high-visibility crossings along ${corridor} in ${place}, with ADA curb ramps.`,
+    weight: 6,
+    name: (c) => `${c.contract} ${c.place} Sidewalk and Crossing Gap Closure — ${c.corridor}`,
+    description: (c) =>
+      `Fill sidewalk gaps and add high-visibility crossings along ${c.corridor} ${c.mp} in ${c.place}, with ADA curb ramps.`,
     tags: ["pedestrian", "ada", "crossing", "vru"],
     modes: ["pedestrian", "bicycle"],
     cost: [1_200_000, 8_500_000],
   },
   {
+    category: "bike-ped",
+    weight: 3,
+    name: (c) => `${c.contract} ${c.place} Shared-Use Path — ${c.corridor} ${c.phase}`,
+    description: (c) =>
+      `Construct a shared-use path parallel to ${c.corridor} ${c.mp} connecting neighborhoods and schools in ${c.place}.`,
+    tags: ["bicycle", "pedestrian", "trail", "vru"],
+    modes: ["pedestrian", "bicycle"],
+    cost: [2_200_000, 12_000_000],
+  },
+  {
     category: "bridge",
-    name: (place, corridor) => `${corridor} Bridge Preservation — ${place}`,
-    description: (place, corridor) =>
-      `Deck overlay, joint replacement, and scour countermeasures on the ${corridor} bridge near ${place}.`,
+    weight: 8,
+    name: (c) => `${c.contract} ${c.corridor} Bridge Preservation — ${c.place} ${c.phase}`,
+    description: (c) =>
+      `Deck overlay, joint replacement, and scour countermeasures on the ${c.corridor} bridge near ${c.place} (${c.mp}).`,
     tags: ["bridge", "preservation", "state-of-good-repair"],
     modes: ["auto", "freight"],
     cost: [4_000_000, 38_000_000],
   },
   {
+    category: "bridge",
+    weight: 4,
+    name: (c) => `${c.contract} ${c.corridor} Bridge Culvert Replacement — ${c.place}`,
+    description: (c) =>
+      `Replace a deteriorated culvert on ${c.corridor} ${c.mp} near ${c.place} to restore hydraulic capacity and legal loads.`,
+    tags: ["bridge", "culvert", "scour", "state-of-good-repair"],
+    modes: ["auto", "freight"],
+    cost: [1_500_000, 12_000_000],
+  },
+  {
     category: "pavement",
-    name: (place, corridor) => `${corridor} Pavement Rehab — ${place} Section`,
-    description: (place, corridor) =>
-      `Mill and overlay of deteriorated ${corridor} lanes through ${place} to restore ride quality.`,
-    tags: ["pavement", "preservation"],
+    weight: 10,
+    name: (c) => `${c.contract} ${c.corridor} Pavement Rehab — ${c.place} ${c.phase}`,
+    description: (c) =>
+      `Mill and overlay of deteriorated ${c.corridor} lanes through ${c.place} (${c.mp}) to restore ride quality. Limited safety or equity components.`,
+    tags: ["pavement", "preservation", "state-of-good-repair"],
     modes: ["auto"],
     cost: [3_000_000, 22_000_000],
   },
   {
+    category: "pavement",
+    weight: 4,
+    name: (c) => `${c.contract} ${c.corridor} Concrete Pavement Restoration — ${c.place}`,
+    description: (c) =>
+      `Slab repair, diamond grinding, and joint resealing on ${c.corridor} ${c.mp} in ${c.county} County near ${c.place}.`,
+    tags: ["pavement", "concrete", "preservation"],
+    modes: ["auto"],
+    cost: [4_500_000, 28_000_000],
+  },
+  {
     category: "signals",
-    name: (place, corridor) => `${place} Adaptive Signal System on ${corridor}`,
-    description: (place, corridor) =>
-      `Adaptive signal control, detection, and communications along ${corridor} in ${place}.`,
+    weight: 5,
+    name: (c) => `${c.contract} ${c.place} Adaptive Signal System — ${c.corridor}`,
+    description: (c) =>
+      `Adaptive signal control, detection, and communications along ${c.corridor} ${c.mp} in ${c.place}.`,
     tags: ["signal", "operations", "congestion", "safety"],
     modes: ["auto", "transit"],
     cost: [1_800_000, 9_000_000],
   },
   {
+    category: "signals",
+    weight: 3,
+    name: (c) => `${c.contract} ${c.corridor} ITS Camera and Fiber — ${c.place} ${c.phase}`,
+    description: (c) =>
+      `CCTV, fiber interconnect, and TMC integration on ${c.corridor} ${c.mp} serving ${c.place} and ${c.county} County operations.`,
+    tags: ["its", "operations", "congestion", "signal"],
+    modes: ["auto"],
+    cost: [1_200_000, 7_500_000],
+  },
+  {
     category: "resilience",
-    name: (place, corridor) => `${corridor} Drainage and Flood Mitigation — ${place}`,
-    description: (place, corridor) =>
-      `Stormwater upgrades and roadway raising where ${corridor} floods near ${place}.`,
+    weight: 5,
+    name: (c) => `${c.contract} ${c.corridor} Drainage and Flood Mitigation — ${c.place}`,
+    description: (c) =>
+      `Stormwater upgrades and roadway raising where ${c.corridor} ${c.mp} floods near ${c.place}.`,
     tags: ["flood", "drainage", "resilience"],
     modes: ["auto"],
     cost: [5_000_000, 32_000_000],
   },
   {
+    category: "resilience",
+    weight: 3,
+    name: (c) => `${c.contract} ${c.place} Slope Stabilization — ${c.corridor} ${c.mp}`,
+    description: (c) =>
+      `Embankment repair, drainage, and slope stabilization on ${c.corridor} near ${c.place} after repeated washouts.`,
+    tags: ["slope", "drainage", "resilience", "geotech"],
+    modes: ["auto"],
+    cost: [2_000_000, 14_000_000],
+  },
+  {
     category: "transit",
-    name: (place) => `${place} DART Stop and Access Improvements`,
-    description: (place, corridor) =>
-      `Accessible pads, shelters, lighting, and sidewalk connections to DART stops on ${corridor} in ${place}.`,
+    weight: 4,
+    name: (c) => `${c.contract} ${c.place} DART Stop and Access Improvements — ${c.corridor}`,
+    description: (c) =>
+      `Accessible pads, shelters, lighting, and sidewalk connections to DART stops on ${c.corridor} in ${c.place}.`,
     tags: ["transit", "equity", "pedestrian", "ada"],
     modes: ["transit", "pedestrian"],
     cost: [900_000, 6_500_000],
   },
   {
+    category: "transit",
+    weight: 1,
+    name: (c) => `${c.contract} DART Bus Fleet Replacement — ${c.place} Division`,
+    description: (c) =>
+      `Replace diesel buses with low- and no-emission transit buses and related equipment at the DART ${c.place} division, including depot charging.`,
+    tags: ["transit", "bus-fleet", "low-no", "zero-emission", "garage"],
+    modes: ["transit"],
+    cost: [8_000_000, 42_000_000],
+  },
+  {
+    category: "transit",
+    weight: 1,
+    name: (c) => `${c.contract} DART Bus Maintenance Facility Rehab — ${c.place}`,
+    description: (c) =>
+      `Rehabilitate the DART bus maintenance garage in ${c.place}, including lifts, bus wash, and charging/fueling for the transit fleet.`,
+    tags: ["transit", "bus-fleet", "garage", "facility", "low-no"],
+    modes: ["transit"],
+    cost: [6_000_000, 35_000_000],
+  },
+  {
     category: "freight",
-    name: (place) => `${place} Truck Route Geometric Improvements`,
-    description: (place, corridor) =>
-      `Widen turning radii and upgrade shoulders for freight movements on ${corridor} near ${place}.`,
+    weight: 4,
+    name: (c) => `${c.contract} ${c.place} Truck Route Geometric Improvements — ${c.corridor}`,
+    description: (c) =>
+      `Widen turning radii and upgrade shoulders for freight movements on ${c.corridor} ${c.mp} near ${c.place}.`,
     tags: ["freight", "geometry", "shoulders"],
     modes: ["freight", "auto"],
     cost: [4_500_000, 19_000_000],
   },
   {
+    category: "freight",
+    weight: 2,
+    name: (c) => `${c.contract} ${c.corridor} Freight Bottleneck Relief — ${c.place}`,
+    description: (c) =>
+      `Intersection capacity, turning-radius, and signal timing improvements for industrial freight on ${c.corridor} ${c.mp} in ${c.place}.`,
+    tags: ["freight", "bottleneck", "signal", "reliability"],
+    modes: ["freight", "auto"],
+    cost: [6_000_000, 28_000_000],
+  },
+  {
     category: "complete-streets",
-    name: (place, corridor) => `${place} Complete Streets — ${corridor} Town Center`,
-    description: (place, corridor) =>
-      `Lane reallocation, bicycle facilities, and pedestrian lighting on ${corridor} through ${place} town center.`,
+    weight: 4,
+    name: (c) => `${c.contract} ${c.place} Complete Streets — ${c.corridor} Town Center`,
+    description: (c) =>
+      `Lane reallocation, bicycle facilities, and pedestrian lighting on ${c.corridor} through ${c.place} town center (${c.phase}).`,
     tags: ["complete-streets", "bike-ped", "equity", "safety"],
     modes: ["auto", "pedestrian", "bicycle"],
     cost: [3_500_000, 18_000_000],
   },
   {
+    category: "complete-streets",
+    weight: 2,
+    name: (c) => `${c.contract} ${c.place} Road Diet and Downtown Safety — ${c.corridor}`,
+    description: (c) =>
+      `Road diet, on-street parking reconfiguration, ADA ramps, and pedestrian lighting in ${c.place} along ${c.corridor}.`,
+    tags: ["road-diet", "ada", "downtown", "complete-streets", "safety"],
+    modes: ["auto", "pedestrian", "bicycle"],
+    cost: [2_800_000, 14_000_000],
+  },
+  {
     category: "ev-charging",
-    name: (place) => `${place} Community Charging Hub`,
-    description: (place, corridor) =>
-      `Public DC fast charging adjacent to ${corridor} serving ${place} residents without home charging.`,
-    tags: ["ev", "equity", "community"],
+    weight: 2,
+    name: (c) => `${c.contract} ${c.place} Community Charging Hub — ${c.corridor}`,
+    description: (c) =>
+      `Public DC fast charging adjacent to ${c.corridor} serving ${c.place} residents without home charging.`,
+    tags: ["ev", "equity", "community", "charging"],
     modes: ["auto"],
     cost: [800_000, 4_200_000],
   },
   {
     category: "planning",
-    name: (place) => `${place} Local Road Safety Plan`,
-    description: (place) =>
-      `Data-driven local road safety plan for ${place} identifying a high-injury network and proven countermeasures.`,
+    weight: 3,
+    name: (c) => `${c.contract} ${c.place} Local Road Safety Plan`,
+    description: (c) =>
+      `Data-driven local road safety plan for ${c.place} identifying a high-injury network and proven countermeasures.`,
     tags: ["safety-plan", "data-driven", "planning"],
     modes: ["auto", "pedestrian"],
     cost: [250_000, 1_200_000],
+  },
+  {
+    category: "planning",
+    weight: 1,
+    name: (c) => `${c.contract} ${c.county} County Freight and Multimodal Plan Update`,
+    description: (c) =>
+      `Update the ${c.county} County freight and multimodal plan, including bottleneck screening on ${c.corridor} and equity analysis.`,
+    tags: ["planning", "freight", "multimodal", "data-driven"],
+    modes: ["auto", "freight", "transit"],
+    cost: [400_000, 1_800_000],
+  },
+  {
+    category: "safety",
+    weight: 2,
+    name: (c) => `${c.contract} ${c.place} Roundabout Conversion — ${c.corridor}`,
+    description: (c) =>
+      `Convert a high-crash ${c.corridor} intersection in ${c.place} (${c.mp}) to a single-lane roundabout with pedestrian crossings.`,
+    tags: ["roundabout", "intersection", "safety", "pedestrian"],
+    modes: ["auto", "pedestrian"],
+    cost: [3_200_000, 14_000_000],
+  },
+  {
+    category: "safety",
+    weight: 2,
+    name: (c) => `${c.contract} ${c.corridor} Guardrail and End Treatment Upgrade — ${c.place}`,
+    description: (c) =>
+      `Replace outdated guardrail and end treatments on ${c.corridor} ${c.mp} near ${c.place} to current MASH standards.`,
+    tags: ["guardrail", "safety", "roadside", "systemic"],
+    modes: ["auto"],
+    cost: [700_000, 4_800_000],
   },
 ];
 
@@ -484,21 +724,52 @@ function lerp(rand: () => number, min: number, max: number) {
   return min + rand() * (max - min);
 }
 
-export const TARGET_PROJECT_COUNT = 248;
+export const TARGET_PROJECT_COUNT = 2500;
+
+function contractId(n: number): string {
+  const year = 2022 + (n % 6);
+  const seq = 10000 + ((n * 37) % 80000);
+  return `T${year}${seq}`;
+}
+
+function weightedPick<T extends { weight: number }>(rand: () => number, items: readonly T[]): T {
+  const total = items.reduce((sum, item) => sum + item.weight, 0);
+  let roll = rand() * total;
+  for (const item of items) {
+    roll -= item.weight;
+    if (roll <= 0) return item;
+  }
+  return items[items.length - 1]!;
+}
 
 export function getUnfundedProjects(): Project[] {
   const rand = mulberry32(202407);
   const projects: Project[] = FEATURED.map((spec, i) => ({
-    id: `proj-${String(i + 1).padStart(3, "0")}`,
+    id: `proj-${String(i + 1).padStart(4, "0")}`,
     ...spec,
   }));
+  const usedNames = new Set(projects.map((p) => p.name));
 
   let n = projects.length;
-  while (projects.length < TARGET_PROJECT_COUNT) {
+  let guard = 0;
+  while (projects.length < TARGET_PROJECT_COUNT && guard < TARGET_PROJECT_COUNT * 8) {
+    guard += 1;
     const county = pick(rand, COUNTIES);
     const place = pick(rand, PLACES[county]);
     const corridor = pick(rand, CORRIDORS);
-    const template = pick(rand, TEMPLATES);
+    const template = weightedPick(rand, TEMPLATES);
+    n += 1;
+    const ctx: NameCtx = {
+      place,
+      corridor,
+      county,
+      contract: contractId(n),
+      mp: `MP ${(1 + rand() * 44).toFixed(1)}`,
+      phase: pick(rand, PHASES),
+    };
+    const name = template.name(ctx);
+    if (usedNames.has(name)) continue;
+    usedNames.add(name);
     const cost = Math.round(lerp(rand, template.cost[0], template.cost[1]) / 10000) * 10000;
     const designPercent = Math.round(lerp(rand, 5, 100));
     const readiness =
@@ -511,16 +782,15 @@ export function getUnfundedProjects(): Project[] {
             : designPercent >= 20
               ? "preliminary-design"
               : "planning";
-    const fatalities = template.category === "safety" || template.category === "bike-ped"
-      ? Math.floor(rand() * 6)
-      : Math.floor(rand() * 2);
-    const injuries = fatalities * 4 + Math.floor(rand() * 12);
-    n += 1;
+    const safetyLike = template.category === "safety" || template.category === "bike-ped" || template.category === "complete-streets";
+    const fatalities = safetyLike ? Math.floor(rand() * 7) : Math.floor(rand() * 2);
+    const injuries = fatalities * 4 + Math.floor(rand() * 14);
+    const rural = county === "Sussex" ? rand() > 0.25 : county === "Kent" ? rand() > 0.35 : rand() > 0.82;
     projects.push({
-      id: `proj-${String(n).padStart(3, "0")}`,
-      unifierId: `UNF-${2000 + n}`,
-      name: template.name(place, corridor, n),
-      description: template.description(place, corridor),
+      id: `proj-${String(projects.length + 1).padStart(4, "0")}`,
+      unifierId: `UNF-${2000 + projects.length}`,
+      name,
+      description: template.description(ctx),
       county,
       corridor,
       category: template.category,
@@ -538,11 +808,15 @@ export function getUnfundedProjects(): Project[] {
       },
       equity: {
         disadvantagedCommunity: rand() > 0.55,
-        rural: county !== "New Castle" && rand() > 0.35,
+        rural,
         environmentalJustice: rand() > 0.7,
       },
       tags: [...template.tags],
     });
+  }
+
+  if (projects.length < TARGET_PROJECT_COUNT) {
+    throw new Error(`Unifier sample inventory generated ${projects.length} rows, expected ${TARGET_PROJECT_COUNT}`);
   }
 
   return projects;

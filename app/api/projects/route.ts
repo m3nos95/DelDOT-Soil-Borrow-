@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="Unfunded Projects - Jul 2024.csv"',
+        "Content-Disposition": 'attachment; filename="Unfunded Projects - Unifier Sample 2500.csv"',
       },
     });
   }

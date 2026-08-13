@@ -6,7 +6,7 @@ USDOT publishes roughly 50–60 competitive NOFOs a year. Each 25–30 page noti
 
 ## What it does
 
-1. Loads Unifier unfunded-project data (Phase 1: Excel/CSV export; 248 sample Delaware projects included).
+1. Loads Unifier unfunded-project data (Phase 1: Excel/CSV export; **2,500** sample Delaware projects included).
 2. Accepts an uploaded NOFO (PDF or text) or a sample SS4A / RAISE / BIP / PROTECT notice.
 3. Extracts eligibility, evaluation criteria, program priorities, and funding objectives.
 4. Scores every project (eligibility, evaluation fit, priorities, funding objectives, historic award intelligence).
@@ -28,7 +28,7 @@ Open [http://localhost:3000](http://localhost:3000). On the dashboard, click **A
 
 ## Sample unfunded-projects CSV
 
-Use `public/samples/unfunded-projects-sample.csv` (15 Delaware example projects) or the shorter template `public/samples/unfunded-projects-template.csv`. With the app running you can also download them from **Upload**, or get a 248-row export at `/api/projects?sample=csv`.
+Use `public/samples/unfunded-projects-sample.csv` (15 Delaware example projects), the full Unifier-style export `public/samples/unfunded-projects-unifier-full.csv` (**2,500** rows), or the shorter template `public/samples/unfunded-projects-template.csv`. With the app running you can also download them from **Upload**, or get the same 2,500-row export at `/api/projects?sample=csv`.
 
 Only **Project Name** is required. Add Description, Category, Unfunded Amount, crash/equity flags, and Tags when you have them — those drive match scores.
 
