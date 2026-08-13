@@ -110,6 +110,7 @@ describe("matching engine", () => {
     expect(fleet).toBeTruthy();
     expect(interchange).toBeTruthy();
     expect(fleet!.score).toBeGreaterThan(interchange!.score);
+    expect(fleet!.score).toBeGreaterThanOrEqual(70);
     expect(fleet!.recommended).toBe(true);
     expect(fleet!.fitBand).toBe("eligible");
   });

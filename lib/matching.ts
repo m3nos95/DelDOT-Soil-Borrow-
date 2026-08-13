@@ -398,6 +398,7 @@ export function scoreProject(
     breakdown.priorities * WEIGHTS.priorities +
     breakdown.fundingObjectives * WEIGHTS.fundingObjectives +
     breakdown.historic * WEIGHTS.historic;
+  if (band === "eligible") score += 10;
   if (band === "ineligible") score = Math.min(score, 28);
   else if (band === "adjacent") score = Math.min(score, 55);
   score = clamp(score);
